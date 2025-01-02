@@ -282,15 +282,9 @@ export function Dropdown({
                   display: "flex",
                   flexDirection: "column",
                   gap: 12,
-                  background: "#4F4A6B",
+                  background: "token(colors.grayPurple:80)",
                   borderRadius: 20,
                   border: "1px solid token(colors.border)",
-                  // boxShadow: `
-                  //   0 24px 10px rgba(18, 27, 68, 0.01),
-                  //   0 14px 8px rgba(18, 27, 68, 0.05),
-                  //   0 6px 6px rgba(18, 27, 68, 0.09),
-                  //   0 2px 3px rgba(18, 27, 68, 0.1)
-                  // `,
                 })}
                 style={appearStyles}
               >

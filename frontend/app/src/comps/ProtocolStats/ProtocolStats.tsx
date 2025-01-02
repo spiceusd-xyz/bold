@@ -38,7 +38,7 @@ export function ProtocolStats() {
     >
       <div
         className={css({
-          color: '#ECE9F4',
+          color: 'purple:20',
           display: "flex",
           justifyContent: "space-between",
           width: "100%",

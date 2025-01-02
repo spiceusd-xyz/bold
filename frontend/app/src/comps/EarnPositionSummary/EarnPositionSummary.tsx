@@ -383,7 +383,7 @@ function OpenLink({
           width: 34,
           height: 34,
           color: "white",
-          background: "#8D42FF",
+          background: "lightPurple:50",
           borderRadius: "50%",
         })}
       >

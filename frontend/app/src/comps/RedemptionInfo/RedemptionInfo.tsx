@@ -51,7 +51,7 @@ export const RedemptionInfo = memo(function RedemptionInfo() {
         gap: 32,
         padding: 16,
         color: "content",
-        background: "#322E3D",
+        background: "darkPurple:80",
         borderRadius: 8,
       })}
     >

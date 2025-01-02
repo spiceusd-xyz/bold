@@ -3,6 +3,7 @@ import type { ComponentPropsWithoutRef, ReactNode } from "react";
 import { match, P } from "ts-pattern";
 import { css, cx } from "../../styled-system/css";
 import { useTheme } from "../Theme/Theme";
+import { token } from "../../styled-system/tokens";
 
 export type ButtonProps = {
   label: ReactNode;
@@ -89,9 +90,9 @@ export function useButtonStyles({
   const colors = match(mode)
     .with("primary", () => ({
       "--color": color("accentContent"),
-      "--background": "#8D42FF",
-      "--backgroundHover": "#8D42FF",
-      "--backgroundPressed": "#8D42FF",
+      "--background": token("colors.lightPurple:50"),
+      "--backgroundHover": token("colors.lightPurple:50"),
+      "--backgroundPressed": token("colors.lightPurple:50"),
     }))
     .with(P.union("secondary", "tertiary"), (mode) => ({
       "--color": color("secondaryContent"),
