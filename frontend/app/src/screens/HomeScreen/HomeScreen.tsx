@@ -9,6 +9,7 @@ import { DNUM_1 } from "@/src/dnum-utils";
 import { getCollIndexFromSymbol, getCollToken, useAverageInterestRate, useEarnPool } from "@/src/liquity-utils";
 import { useAccount } from "@/src/services/Ethereum";
 import { css } from "@/styled-system/css";
+import { token } from "@/styled-system/tokens";
 import { AnchorTextButton, IconBorrow, IconEarn, TokenIcon } from "@liquity2/uikit";
 import * as dn from "dnum";
 import Link from "next/link";
@@ -121,6 +122,9 @@ function BorrowingRow({
             passHref
           >
             <AnchorTextButton
+              style={{
+                color: token("colors.lightPurple:30")
+              }}
               label={
                 <div
                   className={css({
@@ -143,6 +147,9 @@ function BorrowingRow({
             passHref
           >
             <AnchorTextButton
+              style={{
+                color: token("colors.lightPurple:30")
+              }}
               label={
                 <div
                   className={css({
@@ -210,6 +217,9 @@ function EarnRewardsRow({
           passHref
         >
           <AnchorTextButton
+            style={{
+              color: token("colors.lightPurple:30")
+            }}
             label={
               <div
                 className={css({

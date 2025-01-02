@@ -3,6 +3,7 @@ import type { ComponentPropsWithoutRef, ReactNode } from "react";
 import { match, P } from "ts-pattern";
 import { css, cx } from "../../styled-system/css";
 import { useTheme } from "../Theme/Theme";
+import { token } from "../../styled-system/tokens";
 
 export type ButtonProps = {
   label: ReactNode;
@@ -89,10 +90,9 @@ export function useButtonStyles({
   const colors = match(mode)
     .with("primary", () => ({
       "--color": color("accentContent"),
-      "--background": color("accent"),
-      // "--backgroundHover": color("accentHint"),
-      "--backgroundHover": color("accent"),
-      "--backgroundPressed": color("accentActive"),
+      "--background": token("colors.lightPurple:50"),
+      "--backgroundHover": token("colors.lightPurple:50"),
+      "--backgroundPressed": token("colors.lightPurple:50"),
     }))
     .with(P.union("secondary", "tertiary"), (mode) => ({
       "--color": color("secondaryContent"),
@@ -108,9 +108,9 @@ export function useButtonStyles({
     }))
     .with("positive", () => ({
       "--color": color("positiveContent"),
-      "--background": color("positive"),
-      "--backgroundHover": color("positiveHint"),
-      "--backgroundPressed": color("positiveActive"),
+      "--background": color("accent"),
+      "--backgroundHover": color("accent"),
+      "--backgroundPressed": color("accent"),
     }))
     .exhaustive();
 
