@@ -2,24 +2,51 @@
 
 pragma solidity 0.8.24;
 
+import "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+
 import "./BaseZapper.sol";
 import "../Dependencies/Constants.sol";
+import "../interfaces/INrETH.sol";
 
 contract WETHZapper is BaseZapper {
+    using SafeERC20 for IERC20;
+
+    IERC20 public immutable collToken;
+
     constructor(
         IAddressesRegistry _addressesRegistry,
         IFlashLoanProvider _flashLoanProvider,
         IExchange _exchange
     ) BaseZapper(_addressesRegistry, _flashLoanProvider, _exchange) {
+        collToken = _addressesRegistry.collToken();
         require(
-            address(WETH) == address(_addressesRegistry.collToken()),
+            address(WETH) == INrETH(payable(address(collToken))).TOKEN(),
             "WZ: Wrong coll branch"
         );
 
         // Approve coll to BorrowerOperations
         WETH.approve(address(borrowerOperations), type(uint256).max);
+        collToken.approve(address(borrowerOperations), type(uint256).max);
         // Approve Coll to exchange module (for closeTroveFromCollateral)
         WETH.approve(address(_exchange), type(uint256).max);
+        collToken.approve(address(_exchange), type(uint256).max);
+    }
+
+    function _wrapToColl(uint256 _amount) internal returns (uint256) {
+        INrETH t = INrETH(payable(address(collToken)));
+        uint256 shares = t.getNrERC20ByStERC20(_amount);
+        uint256 wrapAmount = t.getStERC20ByNrERC20(shares);
+        WETH.approve(address(collToken), wrapAmount);
+        uint256 remains = _amount - wrapAmount;
+        if (remains > 0) {
+            WETH.transfer(msg.sender, _amount - wrapAmount);
+        }
+        return t.wrap(wrapAmount);
+    }
+
+    function _unwrapFromColl(uint256 _amount) internal returns (uint256) {
+        INrETH t = INrETH(payable(address(collToken)));
+        return t.unwrap(_amount);
     }
 
     function openTroveWithRawETH(
@@ -34,13 +61,14 @@ contract WETHZapper is BaseZapper {
 
         // Convert ETH to WETH
         WETH.deposit{value: msg.value}();
+        uint256 amount = _wrapToColl(msg.value - ETH_GAS_COMPENSATION);
 
         uint256 troveId;
         if (_params.batchManager == address(0)) {
             troveId = borrowerOperations.openTrove(
                 _params.owner,
                 _params.ownerIndex,
-                msg.value - ETH_GAS_COMPENSATION,
+                amount,
                 _params.boldAmount,
                 _params.upperHint,
                 _params.lowerHint,
@@ -58,7 +86,7 @@ contract WETHZapper is BaseZapper {
                     .OpenTroveAndJoinInterestBatchManagerParams({
                         owner: _params.owner,
                         ownerIndex: _params.ownerIndex,
-                        collAmount: msg.value - ETH_GAS_COMPENSATION,
+                        collAmount: amount,
                         boldAmount: _params.boldAmount,
                         upperHint: _params.upperHint,
                         lowerHint: _params.lowerHint,
@@ -93,8 +121,9 @@ contract WETHZapper is BaseZapper {
         _requireSenderIsOwnerOrAddManager(_troveId, owner);
         // Convert ETH to WETH
         WETH.deposit{value: msg.value}();
+        uint256 amount = _wrapToColl(msg.value);
 
-        borrowerOperations.addColl(_troveId, msg.value);
+        borrowerOperations.addColl(_troveId, amount);
     }
 
     function withdrawCollToRawETH(uint256 _troveId, uint256 _amount) external {
@@ -106,8 +135,9 @@ contract WETHZapper is BaseZapper {
         borrowerOperations.withdrawColl(_troveId, _amount);
 
         // Convert WETH to ETH
-        WETH.withdraw(_amount);
-        (bool success, ) = receiver.call{value: _amount}("");
+        uint256 unwrappedAmount = _unwrapFromColl(_amount);
+        WETH.withdraw(unwrappedAmount);
+        (bool success, ) = receiver.call{value: unwrappedAmount}("");
         require(success, "WZ: Sending ETH failed");
     }
 
@@ -154,7 +184,7 @@ contract WETHZapper is BaseZapper {
         uint256 _maxUpfrontFee
     ) external payable {
         InitialBalances memory initialBalances;
-        address payable receiver = _adjustTrovePre(
+        (address payable receiver, uint256 newCollChange) = _adjustTrovePre(
             _troveId,
             _collChange,
             _isCollIncrease,
@@ -164,14 +194,14 @@ contract WETHZapper is BaseZapper {
         );
         borrowerOperations.adjustTrove(
             _troveId,
-            _collChange,
+            newCollChange,
             _isCollIncrease,
             _boldChange,
             _isDebtIncrease,
             _maxUpfrontFee
         );
         _adjustTrovePost(
-            _collChange,
+            newCollChange,
             _isCollIncrease,
             _boldChange,
             _isDebtIncrease,
@@ -191,7 +221,7 @@ contract WETHZapper is BaseZapper {
         uint256 _maxUpfrontFee
     ) external payable {
         InitialBalances memory initialBalances;
-        address payable receiver = _adjustTrovePre(
+        (address payable receiver, uint256 newCollChange) = _adjustTrovePre(
             _troveId,
             _collChange,
             _isCollIncrease,
@@ -201,7 +231,7 @@ contract WETHZapper is BaseZapper {
         );
         borrowerOperations.adjustZombieTrove(
             _troveId,
-            _collChange,
+            newCollChange,
             _isCollIncrease,
             _boldChange,
             _isDebtIncrease,
@@ -210,7 +240,7 @@ contract WETHZapper is BaseZapper {
             _maxUpfrontFee
         );
         _adjustTrovePost(
-            _collChange,
+            newCollChange,
             _isCollIncrease,
             _boldChange,
             _isDebtIncrease,
@@ -226,7 +256,7 @@ contract WETHZapper is BaseZapper {
         uint256 _boldChange,
         bool _isDebtIncrease,
         InitialBalances memory _initialBalances
-    ) internal returns (address payable) {
+    ) internal returns (address payable, uint256) {
         if (_isCollIncrease) {
             require(_collChange == msg.value, "WZ: Wrong coll amount");
         } else {
@@ -252,6 +282,7 @@ contract WETHZapper is BaseZapper {
         // ETH -> WETH
         if (_isCollIncrease) {
             WETH.deposit{value: _collChange}();
+            _collChange = _wrapToColl(_collChange);
         }
 
         // Pull Bold
@@ -259,7 +290,7 @@ contract WETHZapper is BaseZapper {
             boldToken.transferFrom(msg.sender, address(this), _boldChange);
         }
 
-        return receiver;
+        return (receiver, _collChange);
     }
 
     function _adjustTrovePost(
@@ -287,8 +318,9 @@ contract WETHZapper is BaseZapper {
 
         // WETH -> ETH
         if (!_isCollIncrease && _collChange > 0) {
-            WETH.withdraw(_collChange);
-            (bool success, ) = _receiver.call{value: _collChange}("");
+            uint256 unwrappedAmount = _unwrapFromColl(_collChange);
+            WETH.withdraw(unwrappedAmount);
+            (bool success, ) = _receiver.call{value: unwrappedAmount}("");
             require(success, "WZ: Sending ETH failed");
         }
         // TODO: remove before deployment!!
@@ -310,9 +342,10 @@ contract WETHZapper is BaseZapper {
 
         borrowerOperations.closeTrove(_troveId);
 
-        WETH.withdraw(trove.entireColl + ETH_GAS_COMPENSATION);
+        uint256 unwrappedAmount = _unwrapFromColl(trove.entireColl);
+        WETH.withdraw(unwrappedAmount + ETH_GAS_COMPENSATION);
         (bool success, ) = receiver.call{
-            value: trove.entireColl + ETH_GAS_COMPENSATION
+            value: unwrappedAmount + ETH_GAS_COMPENSATION
         }("");
         require(success, "WZ: Sending ETH failed");
     }
@@ -320,69 +353,12 @@ contract WETHZapper is BaseZapper {
     function closeTroveFromCollateral(
         uint256 _troveId,
         uint256 _flashLoanAmount
-    ) external override {
-        address owner = troveNFT.ownerOf(_troveId);
-        address payable receiver = payable(
-            _requireSenderIsOwnerOrRemoveManagerAndGetReceiver(_troveId, owner)
-        );
-        CloseTroveParams memory params = CloseTroveParams({
-            troveId: _troveId,
-            flashLoanAmount: _flashLoanAmount,
-            receiver: receiver
-        });
-
-        // Set initial balances to make sure there are not lefovers
-        InitialBalances memory initialBalances;
-        initialBalances.tokens[0] = WETH;
-        initialBalances.tokens[1] = boldToken;
-        _setInitialBalancesAndReceiver(initialBalances, receiver);
-
-        // Flash loan coll
-        flashLoanProvider.makeFlashLoan(
-            WETH,
-            _flashLoanAmount,
-            IFlashLoanProvider.Operation.CloseTrove,
-            abi.encode(params)
-        );
-
-        // return leftovers to user
-        _returnLeftovers(initialBalances);
-    }
+    ) external virtual override {}
 
     function receiveFlashLoanOnCloseTroveFromCollateral(
         CloseTroveParams calldata _params,
         uint256 _effectiveFlashLoanAmount
-    ) external {
-        require(
-            msg.sender == address(flashLoanProvider),
-            "WZ: Caller not FlashLoan provider"
-        );
-
-        LatestTroveData memory trove = troveManager.getLatestTroveData(
-            _params.troveId
-        );
-
-        // Swap Coll from flash loan to Bold, so we can repay and close trove
-        // We swap the flash loan minus the flash loan fee
-        exchange.swapToBold(_effectiveFlashLoanAmount, trove.entireDebt);
-
-        // We asked for a min of entireDebt in swapToBold call above, so we don’t check again here:
-        // uint256 receivedBoldAmount = exchange.swapToBold(_effectiveFlashLoanAmount, trove.entireDebt);
-        //require(receivedBoldAmount >= trove.entireDebt, "WZ: Not enough BOLD obtained to repay");
-
-        borrowerOperations.closeTrove(_params.troveId);
-
-        // Send coll back to return flash loan
-        WETH.transfer(address(flashLoanProvider), _params.flashLoanAmount);
-
-        // Send coll left and gas compensation
-        uint256 collLeft = trove.entireColl +
-            ETH_GAS_COMPENSATION -
-            _params.flashLoanAmount;
-        WETH.withdraw(collLeft);
-        (bool success, ) = _params.receiver.call{value: collLeft}("");
-        require(success, "WZ: Sending ETH failed");
-    }
+    ) external virtual override {}
 
     receive() external payable {}
 
