@@ -20,4 +20,6 @@ interface INrETH {
     function getStERC20ByNrERC20(
         uint256 _shares
     ) external view returns (uint256);
+
+    function tokensPerStERC20() external view returns (uint256);
 }
