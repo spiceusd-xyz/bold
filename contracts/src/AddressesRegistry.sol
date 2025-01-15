@@ -129,4 +129,10 @@ contract AddressesRegistry is Ownable, IAddressesRegistry {
 
         _renounceOwnership();
     }
+
+    function updateInterestRouter(IInterestRouter _interestRouter) external {
+        require(msg.sender == address(interestRouter), "caller is not the current interest router");
+        interestRouter = _interestRouter;
+        emit InterestRouterAddressChanged(address(_interestRouter));
+    }
 }
