@@ -6,12 +6,13 @@ import "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "./BaseZapper.sol";
 import "../Dependencies/Constants.sol";
-import "../interfaces/INrETH.sol";
+import "../interfaces/INrUSDB.sol";
 
-contract WETHZapper is BaseZapper {
+contract USDBZapper is BaseZapper {
     using SafeERC20 for IERC20;
 
     IERC20 public immutable collToken;
+    IERC20 public immutable stCollToken;
 
     constructor(
         IAddressesRegistry _addressesRegistry,
@@ -19,56 +20,54 @@ contract WETHZapper is BaseZapper {
         IExchange _exchange
     ) BaseZapper(_addressesRegistry, _flashLoanProvider, _exchange) {
         collToken = _addressesRegistry.collToken();
-        require(
-            address(WETH) == INrETH(payable(address(collToken))).TOKEN(),
-            "WZ: Wrong coll branch"
-        );
+        stCollToken = IERC20(INrUSDB(address(collToken)).TOKEN());
+        require(address(WETH) != address(collToken), "GCZ: Wrong coll branch");
 
-        // Approve coll to BorrowerOperations
+        // Approve WETH to BorrowerOperations
         WETH.approve(address(borrowerOperations), type(uint256).max);
+        // Approve coll to BorrowerOperations
         collToken.approve(address(borrowerOperations), type(uint256).max);
         // Approve Coll to exchange module (for closeTroveFromCollateral)
-        WETH.approve(address(_exchange), type(uint256).max);
         collToken.approve(address(_exchange), type(uint256).max);
     }
 
-    function _wrapToColl(uint256 _amount) internal returns (uint256) {
-        INrETH t = INrETH(payable(address(collToken)));
+    function _pullColl(uint256 _amount) internal returns (uint256) {
+        INrUSDB t = INrUSDB(address(collToken));
         uint256 shares = t.getNrERC20ByStERC20(_amount);
         uint256 wrapAmount = t.getStERC20ByNrERC20(shares);
-        WETH.approve(address(collToken), wrapAmount);
-        uint256 remains = _amount - wrapAmount;
-        if (remains > 0) {
-            WETH.transfer(msg.sender, _amount - wrapAmount);
-        }
+        stCollToken.safeTransferFrom(msg.sender, address(this), wrapAmount);
+        stCollToken.forceApprove(address(collToken), wrapAmount);
         return t.wrap(wrapAmount);
     }
 
-    function _unwrapFromColl(uint256 _amount) internal returns (uint256) {
-        INrETH t = INrETH(payable(address(collToken)));
-        return t.unwrap(_amount);
+    function _sendColl(address _receiver, uint256 _amount) internal {
+        INrUSDB t = INrUSDB(address(collToken));
+        uint256 value = t.unwrap(_amount);
+        stCollToken.safeTransfer(_receiver, value);
     }
 
     function openTroveWithRawETH(
         OpenTroveParams calldata _params
     ) external payable returns (uint256) {
-        require(msg.value > ETH_GAS_COMPENSATION, "WZ: Insufficient ETH");
+        require(msg.value == ETH_GAS_COMPENSATION, "GCZ: Wrong ETH");
         require(
             _params.batchManager == address(0) ||
                 _params.annualInterestRate == 0,
-            "WZ: Cannot choose interest if joining a batch"
+            "GCZ: Cannot choose interest if joining a batch"
         );
 
         // Convert ETH to WETH
         WETH.deposit{value: msg.value}();
-        uint256 amount = _wrapToColl(msg.value - ETH_GAS_COMPENSATION);
+
+        // Pull coll
+        uint256 collAmount = _pullColl(_params.collAmount);
 
         uint256 troveId;
         if (_params.batchManager == address(0)) {
             troveId = borrowerOperations.openTrove(
                 _params.owner,
                 _params.ownerIndex,
-                amount,
+                collAmount,
                 _params.boldAmount,
                 _params.upperHint,
                 _params.lowerHint,
@@ -86,7 +85,7 @@ contract WETHZapper is BaseZapper {
                     .OpenTroveAndJoinInterestBatchManagerParams({
                         owner: _params.owner,
                         ownerIndex: _params.ownerIndex,
-                        collAmount: amount,
+                        collAmount: collAmount,
                         boldAmount: _params.boldAmount,
                         upperHint: _params.upperHint,
                         lowerHint: _params.lowerHint,
@@ -116,29 +115,29 @@ contract WETHZapper is BaseZapper {
         return troveId;
     }
 
-    function addCollWithRawETH(uint256 _troveId) external payable {
+    function addColl(uint256 _troveId, uint256 _amount) external {
         address owner = troveNFT.ownerOf(_troveId);
         _requireSenderIsOwnerOrAddManager(_troveId, owner);
-        // Convert ETH to WETH
-        WETH.deposit{value: msg.value}();
-        uint256 amount = _wrapToColl(msg.value);
 
-        borrowerOperations.addColl(_troveId, amount);
+        IBorrowerOperations borrowerOperationsCached = borrowerOperations;
+
+        // Pull coll
+        uint256 collAmount = _pullColl(_amount);
+
+        borrowerOperationsCached.addColl(_troveId, collAmount);
     }
 
-    function withdrawCollToRawETH(uint256 _troveId, uint256 _amount) external {
+    function withdrawColl(uint256 _troveId, uint256 _amount) external {
         address owner = troveNFT.ownerOf(_troveId);
-        address payable receiver = payable(
-            _requireSenderIsOwnerOrRemoveManagerAndGetReceiver(_troveId, owner)
+        address receiver = _requireSenderIsOwnerOrRemoveManagerAndGetReceiver(
+            _troveId,
+            owner
         );
 
         borrowerOperations.withdrawColl(_troveId, _amount);
 
-        // Convert WETH to ETH
-        uint256 unwrappedAmount = _unwrapFromColl(_amount);
-        WETH.withdraw(unwrappedAmount);
-        (bool success, ) = receiver.call{value: unwrappedAmount}("");
-        require(success, "WZ: Sending ETH failed");
+        // Send coll left
+        _sendColl(receiver, _amount);
     }
 
     function withdrawBold(
@@ -164,7 +163,7 @@ contract WETHZapper is BaseZapper {
 
         // Set initial balances to make sure there are not lefovers
         InitialBalances memory initialBalances;
-        _setInitialTokensAndBalances(WETH, boldToken, initialBalances);
+        _setInitialTokensAndBalances(collToken, boldToken, initialBalances);
 
         // Pull Bold
         boldToken.transferFrom(msg.sender, address(this), _boldAmount);
@@ -175,16 +174,16 @@ contract WETHZapper is BaseZapper {
         _returnLeftovers(initialBalances);
     }
 
-    function adjustTroveWithRawETH(
+    function adjustTrove(
         uint256 _troveId,
         uint256 _collChange,
         bool _isCollIncrease,
         uint256 _boldChange,
         bool _isDebtIncrease,
         uint256 _maxUpfrontFee
-    ) external payable {
+    ) external {
         InitialBalances memory initialBalances;
-        (address payable receiver, uint256 newCollChange) = _adjustTrovePre(
+        (address receiver, uint256 newCollChange) = _adjustTrovePre(
             _troveId,
             _collChange,
             _isCollIncrease,
@@ -210,7 +209,7 @@ contract WETHZapper is BaseZapper {
         );
     }
 
-    function adjustZombieTroveWithRawETH(
+    function adjustZombieTrove(
         uint256 _troveId,
         uint256 _collChange,
         bool _isCollIncrease,
@@ -219,9 +218,9 @@ contract WETHZapper is BaseZapper {
         uint256 _upperHint,
         uint256 _lowerHint,
         uint256 _maxUpfrontFee
-    ) external payable {
+    ) external {
         InitialBalances memory initialBalances;
-        (address payable receiver, uint256 newCollChange) = _adjustTrovePre(
+        (address receiver, uint256 newCollChange) = _adjustTrovePre(
             _troveId,
             _collChange,
             _isCollIncrease,
@@ -256,33 +255,21 @@ contract WETHZapper is BaseZapper {
         uint256 _boldChange,
         bool _isDebtIncrease,
         InitialBalances memory _initialBalances
-    ) internal returns (address payable, uint256) {
-        if (_isCollIncrease) {
-            require(_collChange == msg.value, "WZ: Wrong coll amount");
-        } else {
-            require(
-                msg.value == 0,
-                "WZ: Not adding coll, no ETH should be received"
-            );
-        }
-
-        address payable receiver = payable(
-            _checkAdjustTroveManagers(
-                _troveId,
-                _collChange,
-                _isCollIncrease,
-                _boldChange,
-                _isDebtIncrease
-            )
+    ) internal returns (address, uint256) {
+        address receiver = _checkAdjustTroveManagers(
+            _troveId,
+            _collChange,
+            _isCollIncrease,
+            _boldChange,
+            _isDebtIncrease
         );
 
         // Set initial balances to make sure there are not lefovers
-        _setInitialTokensAndBalances(WETH, boldToken, _initialBalances);
+        _setInitialTokensAndBalances(collToken, boldToken, _initialBalances);
 
-        // ETH -> WETH
+        // Pull coll
         if (_isCollIncrease) {
-            WETH.deposit{value: _collChange}();
-            _collChange = _wrapToColl(_collChange);
+            _collChange = _pullColl(_collChange);
         }
 
         // Pull Bold
@@ -298,34 +285,21 @@ contract WETHZapper is BaseZapper {
         bool _isCollIncrease,
         uint256 _boldChange,
         bool _isDebtIncrease,
-        address payable _receiver,
+        address _receiver,
         InitialBalances memory _initialBalances
     ) internal {
+        // Send coll left
+        if (!_isCollIncrease) {
+            _sendColl(_receiver, _collChange);
+        }
+
         // Send Bold
         if (_isDebtIncrease) {
             boldToken.transfer(_receiver, _boldChange);
         }
 
-        // return BOLD leftovers to user (trying to repay more than possible)
-        uint256 currentBoldBalance = boldToken.balanceOf(address(this));
-        if (currentBoldBalance > _initialBalances.balances[1]) {
-            boldToken.transfer(
-                _initialBalances.receiver,
-                currentBoldBalance - _initialBalances.balances[1]
-            );
-        }
-        // There shouldn’t be Collateral leftovers, everything sent should end up in the trove
-
-        // WETH -> ETH
-        if (!_isCollIncrease && _collChange > 0) {
-            uint256 unwrappedAmount = _unwrapFromColl(_collChange);
-            WETH.withdraw(unwrappedAmount);
-            (bool success, ) = _receiver.call{value: unwrappedAmount}("");
-            require(success, "WZ: Sending ETH failed");
-        }
-        // TODO: remove before deployment!!
-        assert(address(this).balance == 0);
-        assert(WETH.balanceOf(address(this)) == 0);
+        // return leftovers to user
+        _returnLeftovers(_initialBalances);
     }
 
     function closeTroveToRawETH(uint256 _troveId) external {
@@ -342,12 +316,13 @@ contract WETHZapper is BaseZapper {
 
         borrowerOperations.closeTrove(_troveId);
 
-        uint256 unwrappedAmount = _unwrapFromColl(trove.entireColl);
-        WETH.withdraw(unwrappedAmount + ETH_GAS_COMPENSATION);
-        (bool success, ) = receiver.call{
-            value: unwrappedAmount + ETH_GAS_COMPENSATION
-        }("");
-        require(success, "WZ: Sending ETH failed");
+        // Send coll left
+        _sendColl(receiver, trove.entireColl);
+
+        // Send gas compensation
+        WETH.withdraw(ETH_GAS_COMPENSATION);
+        (bool success, ) = receiver.call{value: ETH_GAS_COMPENSATION}("");
+        require(success, "GCZ: Sending ETH failed");
     }
 
     function closeTroveFromCollateral(
