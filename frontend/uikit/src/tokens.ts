@@ -1,11 +1,15 @@
 import type { Token } from "./types";
 
-import tokenBold from "./token-icons/bold.svg";
+import tokenBold from "./token-icons/SUSD.svg";
 import tokenEth from "./token-icons/eth.svg";
 import tokenLqty from "./token-icons/lqty.svg";
 import tokenLusd from "./token-icons/lusd.svg";
-// import tokenReth from "./token-icons/reth.svg";
-// import tokenSteth from "./token-icons/wsteth.svg";
+import tokenUsdb from "./token-icons/USDB.png";
+import tokenBlast from "./token-icons/BLAST.png";
+import tokenFnx from "./token-icons/FNX.png";
+import tokenHyper from "./token-icons/HYPER.png";
+import tokenThrust from "./token-icons/THRUSTER.png";
+
 
 export type CollateralSymbols = ["ETH", "USDB", "BLAST", "FNX", "HYPER", "THRUST"];
 
@@ -47,35 +51,35 @@ export const ETH : CollateralToken = {
 };
 export const USDB : CollateralToken = {
   collateralRatio: 1.11,
-  icon: tokenEth,
+  icon: tokenUsdb,
   // name: "USDB",
   name: "USDB",
   symbol: "USDB" as const,
 };
 export const BLAST : CollateralToken = {
   collateralRatio: 1.42,
-  icon: tokenEth,
+  icon: tokenBlast,
   // name: "Blast",
   name: "BLAST",
   symbol: "BLAST" as const,
 };
 export const FNX : CollateralToken = {
   collateralRatio: 1.66,
-  icon: tokenEth,
+  icon: tokenFnx,
   // name: "Fenix",
   name: "FNX",
   symbol: "FNX" as const,
 };
 export const HYPER : CollateralToken = {
   collateralRatio: 1.66,
-  icon: tokenEth,
+  icon: tokenHyper,
   // name: "Hyper",
   name: "HYPER",
   symbol: "HYPER" as const,
 };
 export const THRUST : CollateralToken = {
   collateralRatio: 1.66,
-  icon: tokenEth,
+  icon: tokenThrust,
   // name: "Thrust",
   name: "THRUST",
   symbol: "THRUST" as const,
