@@ -141,7 +141,7 @@ function BorrowingRow({
               title={`Borrow ${collateral?.name} from ${symbol}`}
             />
           </Link>
-          <Link
+          {/* <Link
             href={`/leverage/${symbol.toLowerCase()}`}
             legacyBehavior
             passHref
@@ -165,7 +165,7 @@ function BorrowingRow({
               }
               title={`Borrow ${collateral?.name} from ${symbol}`}
             />
-          </Link>
+          </Link> */}
         </div>
       </td>
     </tr>

@@ -1,14 +1,14 @@
+import { CollateralSymbol } from "./tokens";
+
 export type Address = `0x${string}`;
 
 export type Direction = -1 | 1;
 
 export type TokenSymbol =
   | "BOLD"
-  | "ETH"
   | "LQTY"
-  | "RETH"
   | "LUSD"
-  | "WSTETH";
+  | CollateralSymbol;
 
 export type Token = {
   icon: string;

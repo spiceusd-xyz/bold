@@ -17,7 +17,7 @@ import {
   WSTETH_PRICE as DEMO_WSTETH_PRICE,
 } from "@/src/demo-mode";
 import { dnum18, jsonStringifyWithDnum } from "@/src/dnum-utils";
-import { DEMO_MODE } from "@/src/env";
+import { COLL_SYMBOLS, DEMO_MODE } from "@/src/env";
 import { useQuery } from "@tanstack/react-query";
 import * as dn from "dnum";
 import { createContext, useContext, useEffect, useState } from "react";
@@ -35,9 +35,9 @@ const initialPrices: Prices = {
   LUSD: dn.from(1, 18),
 
   // collaterals
-  ETH: null,
-  RETH: null,
-  WSTETH: null,
+  ...(() => Object.fromEntries(
+    COLL_SYMBOLS.map(symbol => [symbol, null])
+  ))() as Record<CollateralSymbol, null>
 };
 
 const PRICE_REFRESH_INTERVAL = 60_000;
@@ -105,19 +105,21 @@ function useCoinGeckoPrice(supportedSymbol: keyof typeof coinGeckoTokenIds) {
 }
 
 let useWatchPrices = function useWatchPrices(callback: (prices: Prices) => void): void {
-  const ethPrice = useWatchCollateralPrice("ETH");
-  const rethPrice = useWatchCollateralPrice("RETH");
-  const wstethPrice = useWatchCollateralPrice("WSTETH");
   const lqtyPrice = useCoinGeckoPrice("LQTY");
   const lusdPrice = useCoinGeckoPrice("LUSD");
+  const collateralPriceMap = Object.fromEntries(
+    COLL_SYMBOLS.map(symbol => [
+      // eslint-disable-next-line react-hooks/rules-of-hooks
+      symbol, useWatchCollateralPrice(symbol)
+    ])
+  )
 
+  // @ts-ignore
   const prevPrices = useRef<Prices>({
     BOLD: null,
     LQTY: null,
     LUSD: null,
-    ETH: null,
-    RETH: null,
-    WSTETH: null,
+    ...Object.fromEntries(COLL_SYMBOLS.map(symbol => [symbol, null])),
   });
 
   useEffect(() => {
@@ -125,11 +127,10 @@ let useWatchPrices = function useWatchPrices(callback: (prices: Prices) => void)
       BOLD: dn.from(1, 18), // TODO
       LQTY: lqtyPrice.data ? dn.from(lqtyPrice.data, 18) : null,
       LUSD: lusdPrice.data ? dn.from(lusdPrice.data, 18) : null,
-
-      ETH: ethPrice.data ? dnum18(ethPrice.data) : null,
-      RETH: rethPrice.data ? dnum18(rethPrice.data) : null,
-      WSTETH: wstethPrice.data ? dnum18(wstethPrice.data) : null,
-    };
+      ...Object.fromEntries(
+        COLL_SYMBOLS.map(symbol => [symbol, collateralPriceMap[symbol].data ? dnum18(collateralPriceMap[symbol].data) : null])
+      )
+    } as Prices
 
     const hasChanged = jsonStringifyWithDnum(newPrices) !== jsonStringifyWithDnum(prevPrices.current);
 
@@ -137,13 +138,13 @@ let useWatchPrices = function useWatchPrices(callback: (prices: Prices) => void)
       callback(newPrices);
       prevPrices.current = newPrices;
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     callback,
-    ethPrice,
-    rethPrice,
-    wstethPrice,
     lqtyPrice,
     lusdPrice,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    ...Object.values(collateralPriceMap),
   ]);
 };
 
@@ -157,8 +158,11 @@ if (DEMO_MODE) {
           BOLD: dn.add(DEMO_BOLD_PRICE, dn.mul(DEMO_BOLD_PRICE, variation())),
           LQTY: dn.add(DEMO_LQTY_PRICE, dn.mul(DEMO_LQTY_PRICE, variation())),
           LUSD: dn.add(DEMO_LUSD_PRICE, dn.mul(DEMO_LUSD_PRICE, variation())),
+          // @ts-ignore
           ETH: dn.add(DEMO_ETH_PRICE, dn.mul(DEMO_ETH_PRICE, variation())),
+          // @ts-ignore
           RETH: dn.add(DEMO_RETH_PRICE, dn.mul(DEMO_RETH_PRICE, variation())),
+          // @ts-ignore
           WSTETH: dn.add(DEMO_WSTETH_PRICE, dn.mul(DEMO_WSTETH_PRICE, variation())),
         });
       };

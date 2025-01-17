@@ -1,5 +1,4 @@
 import type { Delegate, Position, PositionLoanUncommitted } from "@/src/types";
-import type { CollateralToken } from "@liquity2/uikit";
 import type { Dnum } from "dnum";
 
 import { INTEREST_RATE_INCREMENT, INTEREST_RATE_MAX, INTEREST_RATE_MIN } from "@/src/constants";
@@ -106,7 +105,7 @@ export const BORROW_STATS = {
 } as const;
 
 export const EARN_POOLS: Record<
-  CollateralToken["symbol"],
+  string,
   { apr: Dnum; boldQty: Dnum }
 > = {
   ETH: {

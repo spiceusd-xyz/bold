@@ -115,7 +115,7 @@ const CONTRACTS: Contracts = {
 
   collaterals: COLLATERAL_CONTRACTS.map(({ collIndex, symbol, contracts }) => ({
     collIndex,
-    symbol,
+    symbol: symbol as CollateralSymbol,
     contracts: {
       ActivePool: { address: contracts.ACTIVE_POOL, abi: abis.ActivePool },
       BorrowerOperations: { address: contracts.BORROWER_OPERATIONS, abi: abis.BorrowerOperations },

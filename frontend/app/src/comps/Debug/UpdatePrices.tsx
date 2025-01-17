@@ -6,15 +6,15 @@ import { css } from "@/styled-system/css";
 import * as dn from "dnum";
 
 const ETH_RANGE = [200, 5000];
-const RETH_RANGE = [220, 5500];
-const WSTETH_RANGE = [200, 5000];
+// const RETH_RANGE = [220, 5500];
+// const WSTETH_RANGE = [200, 5000];
 
 export function UpdatePrices() {
   const updatePrice = useUpdatePrice();
 
   const ethPrice = usePrice("ETH");
-  const rethPrice = usePrice("RETH");
-  const wstethPrice = usePrice("WSTETH");
+  // const rethPrice = usePrice("RETH");
+  // const wstethPrice = usePrice("WSTETH");
 
   return PRICE_UPDATE_MANUAL && (
     <div
@@ -54,8 +54,8 @@ export function UpdatePrices() {
         >
           {([
             ["ETH", ethPrice, ETH_RANGE],
-            ["RETH", rethPrice, RETH_RANGE],
-            ["WSTETH", wstethPrice, WSTETH_RANGE],
+            // ["RETH", rethPrice, RETH_RANGE],
+            // ["WSTETH", wstethPrice, WSTETH_RANGE],
           ] as const).map(([token, price, range]) => (
             <div
               key={token}
