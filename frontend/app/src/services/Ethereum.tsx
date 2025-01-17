@@ -10,6 +10,7 @@ import type { Chain } from "wagmi/chains";
 import { getContracts } from "@/src/contracts";
 import { ACCOUNT_BALANCES } from "@/src/demo-mode";
 import { useDemoMode } from "@/src/demo-mode";
+import * as dn from "dnum";
 import { dnum18 } from "@/src/dnum-utils";
 import {
   CHAIN_BLOCK_EXPLORER,
@@ -136,7 +137,7 @@ export function useBalance(
   });
 
   return demoMode.enabled && token
-    ? { data: ACCOUNT_BALANCES[token], isLoading: false }
+    ? { data: ACCOUNT_BALANCES[token as keyof typeof ACCOUNT_BALANCES] ?? dn.from(0), isLoading: false }
     : (token === "ETH" ? ethBalance : tokenBalance);
 }
 

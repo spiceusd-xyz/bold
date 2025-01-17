@@ -185,6 +185,7 @@ function Balance({
           size="mini"
           label="tap"
           onClick={() => {
+            // @ts-ignore
             if ((tokenSymbol === "WSTETH" || tokenSymbol === "RETH") && CollToken) {
               writeContract({
                 abi: ERC20Faucet,
