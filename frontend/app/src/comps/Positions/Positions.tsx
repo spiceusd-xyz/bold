@@ -112,6 +112,10 @@ function PositionsGroup({
 
       if (showNewPositionCard) {
         cards.push([positions.length ?? -1, <NewPositionCard key="new" />]);
+        // cards.push(
+        //   [0, <ActionCard key="0" type="borrow" />],
+        //   [1, <ActionCard key="1" type="earn" />],
+        // )
       }
 
       cards = cards.concat(
@@ -145,9 +149,9 @@ function PositionsGroup({
       showNewPositionCard
         ? [
           [0, <ActionCard key="0" type="borrow" />],
-          [1, <ActionCard key="1" type="leverage" />],
+          // [1, <ActionCard key="1" type="leverage" />],
           [2, <ActionCard key="2" type="earn" />],
-          [3, <ActionCard key="3" type="stake" />],
+          // [3, <ActionCard key="3" type="stake" />],
         ]
         : [])
     .exhaustive();

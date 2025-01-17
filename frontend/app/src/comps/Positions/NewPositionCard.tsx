@@ -19,16 +19,16 @@ const actionAttributes = {
     path: "/borrow",
     title: "Borrow",
   },
-  leverage: {
-    colors: {
-      background: token("colors.brandGreen"),
-      foreground: token("colors.brandGreenContent"),
-      foregroundAlt: token("colors.brandGreenContentAlt"),
-    },
-    description: contentActions.leverage.description,
-    path: "/leverage",
-    title: "Leverage",
-  },
+  // leverage: {
+  //   colors: {
+  //     background: token("colors.brandGreen"),
+  //     foreground: token("colors.brandGreenContent"),
+  //     foregroundAlt: token("colors.brandGreenContentAlt"),
+  //   },
+  //   description: contentActions.leverage.description,
+  //   path: "/leverage",
+  //   title: "Leverage",
+  // },
   earn: {
     colors: {
       background: token("colors.brandBlue"),
@@ -39,16 +39,16 @@ const actionAttributes = {
     path: "/earn",
     title: "Earn",
   },
-  stake: {
-    colors: {
-      background: token("colors.brandGolden"),
-      foreground: token("colors.brandGoldenContent"),
-      foregroundAlt: token("colors.brandGoldenContentAlt"),
-    },
-    description: contentActions.stake.description,
-    path: "/stake",
-    title: "Stake",
-  },
+  // stake: {
+  //   colors: {
+  //     background: token("colors.brandGolden"),
+  //     foreground: token("colors.brandGoldenContent"),
+  //     foregroundAlt: token("colors.brandGoldenContentAlt"),
+  //   },
+  //   description: contentActions.stake.description,
+  //   path: "/stake",
+  //   title: "Stake",
+  // },
 } as const;
 
 const RESET_DELAY = 500;
@@ -80,8 +80,9 @@ export function NewPositionCard() {
       compressed1: 0,
       compressed2: 0,
       compressed3: 0,
+      // gridTemplateColumns: "25% 25% 25% 25%",
 
-      gridTemplateColumns: "25% 25% 25% 25%",
+      gridTemplateColumns: "50% 50%",
     },
     to: {
       hovered0: hovered === 0 ? 1 : 0,
@@ -96,10 +97,12 @@ export function NewPositionCard() {
 
       gridTemplateColumns: Array.from({ length: 4 }).map((_, index) => (
         hovered === -1
-          ? "25%"
+          // ? "25%"
+          ? "50%"
           : `${
             (hovered === index
-              ? (348 - (COMPRESSED_WIDTH * 3)) / 348
+              // ? (348 - (COMPRESSED_WIDTH * 3)) / 348
+              ? (348 - (COMPRESSED_WIDTH * 1)) / 348
               : (COMPRESSED_WIDTH / 348)) * 100
           }%`
       )).join(" "),
@@ -219,7 +222,7 @@ export function NewPositionCard() {
             zIndex: index === hovered ? 1 : 0,
             background: colors.background,
             color: colors.foreground,
-            borderRadius: index === 0 ? "8px 0 0 8px" : index === 3 ? "0 8px 8px 0" : 0,
+            borderRadius: index === 0 ? "8px 0 0 8px" : index === Object.keys(actionAttributes).length - 1 ? "0 8px 8px 0" : 0,
           };
 
           return (
