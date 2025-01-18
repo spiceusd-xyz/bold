@@ -1,4 +1,4 @@
-import type { BOLDTokenSymbol, Token } from "./types";
+import type { Token } from "./types";
 
 import tokenBold from "./token-icons/SUSD.svg";
 import tokenEth from "./token-icons/eth.svg";
@@ -10,7 +10,7 @@ import tokenFnx from "./token-icons/FNX.png";
 import tokenHyper from "./token-icons/HYPER.png";
 import tokenThrust from "./token-icons/THRUSTER.png";
 
-export const BOLD_TOKEN_SYMBOL : BOLDTokenSymbol = 'BOLD';
+export const BOLD_TOKEN_SYMBOL = 'BOLD';
 
 export type CollateralSymbols = ["ETH", "USDB", "BLAST", "FNX", "HYPER", "THRUST"];
 
@@ -96,7 +96,7 @@ export const COLLATERALS: CollateralToken[] = [
 ];
 
 export const TOKENS_BY_SYMBOL = {
-  BOLD,
+  [BOLD_TOKEN_SYMBOL]: BOLD,
   LQTY,
   LUSD,
   ETH,
