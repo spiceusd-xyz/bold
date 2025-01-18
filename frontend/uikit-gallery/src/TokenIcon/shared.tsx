@@ -1,10 +1,10 @@
 "use client";
 
-import { TokenIcon } from "@liquity2/uikit";
+import { TokenIcon, BOLD_TOKEN_SYMBOL } from "@liquity2/uikit";
 import { useFixtureSelect } from "react-cosmos/client";
 
 const options = [
-  "BOLD" as const,
+  BOLD_TOKEN_SYMBOL,
   "ETH" as const,
   "RETH" as const,
   "WSTETH" as const,

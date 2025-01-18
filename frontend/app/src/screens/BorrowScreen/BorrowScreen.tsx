@@ -42,6 +42,7 @@ import {
   PillButton,
   TextButton,
   TokenIcon,
+  BOLD_TOKEN_SYMBOL,
 } from "@liquity2/uikit";
 import * as dn from "dnum";
 import { useParams, useRouter } from "next/navigation";
@@ -182,7 +183,7 @@ export function BorrowScreen() {
                   />
                 ))}
               </TokenIcon.Group>,
-              <TokenIcon symbol="BOLD" />,
+              <TokenIcon symbol={BOLD_TOKEN_SYMBOL} />,
             )}
           </HFlex>
         ),
@@ -264,13 +265,13 @@ export function BorrowScreen() {
               id="input-debt"
               contextual={
                 <InputField.Badge
-                  icon={<TokenIcon symbol="BOLD" />}
-                  label="BOLD"
+                  icon={<TokenIcon symbol={BOLD_TOKEN_SYMBOL} />}
+                  label={BOLD_TOKEN_SYMBOL}
                 />
               }
               drawer={debt.isFocused || !isBelowMinDebt ? null : {
                 mode: "error",
-                message: `You must borrow at least ${fmtnum(MIN_DEBT, 2)} BOLD.`,
+                message: `You must borrow at least ${fmtnum(MIN_DEBT, 2)} ${BOLD_TOKEN_SYMBOL}.`,
               }}
               label="Loan"
               placeholder="0.00"

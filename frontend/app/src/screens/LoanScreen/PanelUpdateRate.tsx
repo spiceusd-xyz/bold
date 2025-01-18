@@ -18,7 +18,7 @@ import { useTransactionFlow } from "@/src/services/TransactionFlow";
 import { infoTooltipProps } from "@/src/uikit-utils";
 import { riskLevelToStatusMode } from "@/src/uikit-utils";
 import { css } from "@/styled-system/css";
-import { Button, HFlex, InfoTooltip, StatusDot } from "@liquity2/uikit";
+import { BOLD_TOKEN_SYMBOL, Button, HFlex, InfoTooltip, StatusDot } from "@liquity2/uikit";
 import * as dn from "dnum";
 import { useState } from "react";
 
@@ -41,7 +41,7 @@ export function PanelUpdateRate({
   const deposit = useInputFieldValue((value) => `${dn.format(value)} ${collToken.symbol}`, {
     defaultValue: dn.toString(loan.deposit),
   });
-  const debt = useInputFieldValue((value) => `${dn.format(value)} BOLD`, {
+  const debt = useInputFieldValue((value) => `${dn.format(value)} ${BOLD_TOKEN_SYMBOL}`, {
     defaultValue: dn.toString(loan.borrowed),
   });
 
@@ -149,12 +149,12 @@ export function PanelUpdateRate({
             {
               label: (
                 <>
-                  <div>BOLD interest per year</div>
+                  <div>{BOLD_TOKEN_SYMBOL} interest per year</div>
                   <InfoTooltip {...infoTooltipProps(content.generalInfotooltips.interestRateBoldPerYear)} />
                 </>
               ),
-              before: <Amount value={boldInterestPerYearPrev} suffix="BOLD" />,
-              after: <Amount value={boldInterestPerYear} suffix="BOLD" />,
+              before: <Amount value={boldInterestPerYearPrev} suffix={BOLD_TOKEN_SYMBOL} />,
+              after: <Amount value={boldInterestPerYear} suffix={BOLD_TOKEN_SYMBOL} />,
             },
           ]}
         />

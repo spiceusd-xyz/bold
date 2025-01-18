@@ -8,7 +8,7 @@ import { VoteInput } from "@/src/comps/VoteInput/VoteInput";
 import content from "@/src/content";
 import { fmtnum } from "@/src/formatting";
 import { css } from "@/styled-system/css";
-import { AnchorTextButton, Button, IconExternal, VFlex } from "@liquity2/uikit";
+import { AnchorTextButton, BOLD_TOKEN_SYMBOL, Button, IconExternal, VFlex } from "@liquity2/uikit";
 import { useQuery } from "@tanstack/react-query";
 import * as dn from "dnum";
 import { useState } from "react";
@@ -343,7 +343,7 @@ export function PanelVoting() {
 const INITIATIVES_DEMO: Initiative[] = [
   {
     id: "1",
-    name: "WETH-BOLD 0.3%",
+    name: `WETH-${BOLD_TOKEN_SYMBOL} 0.3%`,
     protocol: "Uniswap V4",
     tvl: dn.from(2_420_000, 18),
     pairVolume: dn.from(1_420_000, 18),
@@ -351,7 +351,7 @@ const INITIATIVES_DEMO: Initiative[] = [
   },
   {
     id: "2",
-    name: "WETH-BOLD 0.3%",
+    name: `WETH-${BOLD_TOKEN_SYMBOL} 0.3%`,
     protocol: "Uniswap V4",
     tvl: dn.from(2_420_000, 18),
     pairVolume: dn.from(1_420_000, 18),
@@ -359,7 +359,7 @@ const INITIATIVES_DEMO: Initiative[] = [
   },
   {
     id: "3",
-    name: "crvUSD-BOLD 0.01%",
+    name: `crvUSD-${BOLD_TOKEN_SYMBOL} 0.01%`,
     protocol: "Curve V2",
     tvl: dn.from(2_420_000, 18),
     pairVolume: dn.from(1_420_000, 18),
@@ -367,7 +367,7 @@ const INITIATIVES_DEMO: Initiative[] = [
   },
   {
     id: "4",
-    name: "3pool-BOLD 0.01%",
+    name: `3pool-${BOLD_TOKEN_SYMBOL} 0.01%`,
     protocol: "Curve V2",
     tvl: dn.from(2_420_000, 18),
     pairVolume: dn.from(1_420_000, 18),
@@ -375,7 +375,7 @@ const INITIATIVES_DEMO: Initiative[] = [
   },
   {
     id: "5",
-    name: "3pool-BOLD 0.01%",
+    name: `3pool-${BOLD_TOKEN_SYMBOL} 0.01%`,
     protocol: "Curve V2",
     tvl: dn.from(2_420_000, 18),
     pairVolume: dn.from(1_420_000, 18),
@@ -383,7 +383,7 @@ const INITIATIVES_DEMO: Initiative[] = [
   },
   {
     id: "6",
-    name: "3pool-BOLD 0.01%",
+    name: `3pool-${BOLD_TOKEN_SYMBOL} 0.01%`,
     protocol: "Curve V2",
     tvl: dn.from(2_420_000, 18),
     pairVolume: dn.from(1_420_000, 18),
@@ -391,7 +391,7 @@ const INITIATIVES_DEMO: Initiative[] = [
   },
   {
     id: "7",
-    name: "DeFi Collective: BOLD incentives on Euler",
+    name: `DeFi Collective: ${BOLD_TOKEN_SYMBOL} incentives on Euler`,
     protocol: "0x5305...1418",
     tvl: dn.from(0, 18),
     pairVolume: dn.from(0, 18),
@@ -399,7 +399,7 @@ const INITIATIVES_DEMO: Initiative[] = [
   },
   {
     id: "8",
-    name: "DeFi Collective: BOLD-USDC on Balancer",
+    name: `DeFi Collective: ${BOLD_TOKEN_SYMBOL}-USDC on Balancer`,
     protocol: "0x7179...9f8f",
     tvl: dn.from(0, 18),
     pairVolume: dn.from(0, 18),

@@ -16,6 +16,7 @@ import { riskLevelToStatusMode } from "@/src/uikit-utils";
 import { roundToDecimal } from "@/src/utils";
 import { css } from "@/styled-system/css";
 import {
+  BOLD_TOKEN_SYMBOL,
   Button,
   Dropdown,
   HFlex,
@@ -84,7 +85,7 @@ export function LoanScreenCard({
   );
 
   const nftUrl = useTroveNftUrl(loan?.collIndex ?? null, troveId);
-  const title = mode === "leverage" ? "Leverage loan" : "BOLD loan";
+  const title = mode === "leverage" ? "Leverage loan" : `${BOLD_TOKEN_SYMBOL} loan`;
 
   return (
     <ScreenCard
@@ -427,7 +428,7 @@ function LoanCard({
         troveId,
         nftUrl,
       }) => {
-        const title = mode === "leverage" ? "Leverage loan" : "BOLD loan";
+        const title = mode === "leverage" ? "Leverage loan" : `${BOLD_TOKEN_SYMBOL} loan`;
         return (
           <a.div
             className={css({
@@ -539,7 +540,7 @@ function LoanCard({
                           </div>
                         ),
                         label: mode === "leverage"
-                          ? "Convert to BOLD loan"
+                          ? `Convert to ${BOLD_TOKEN_SYMBOL} loan`
                           : "Convert to leverage loan",
                       },
                       {
@@ -676,7 +677,7 @@ function LoanCard({
                     )
                     : (
                       <div
-                        title={`${fmtnum(loan.borrowed)} BOLD`}
+                        title={`${fmtnum(loan.borrowed)} ${BOLD_TOKEN_SYMBOL}`}
                         className={css({
                           display: "flex",
                           alignItems: "center",
@@ -684,7 +685,7 @@ function LoanCard({
                         })}
                       >
                         {fmtnum(loan.borrowed)}
-                        <TokenIcon symbol="BOLD" size={32} />
+                        <TokenIcon symbol={BOLD_TOKEN_SYMBOL} size={32} />
                       </div>
                     )}
                 </div>

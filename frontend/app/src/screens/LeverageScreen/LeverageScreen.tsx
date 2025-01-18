@@ -36,6 +36,7 @@ import { infoTooltipProps } from "@/src/uikit-utils";
 import { css } from "@/styled-system/css";
 import {
   ADDRESS_ZERO,
+  BOLD_TOKEN_SYMBOL,
   Button,
   COLLATERALS as COLL_TOKENS,
   Dropdown,
@@ -157,7 +158,7 @@ export function LeverageScreen() {
     && dn.lte(leverageSlippage.data, LEVERAGE_MAX_SLIPPAGE);
 
   const leverageFieldDrawer = (hasDeposit && newLoan.borrowed && dn.lt(newLoan.borrowed, MIN_DEBT))
-    ? { mode: "error" as const, message: `You must borrow at least ${fmtnum(MIN_DEBT, 2)} BOLD.` }
+    ? { mode: "error" as const, message: `You must borrow at least ${fmtnum(MIN_DEBT, 2)} ${BOLD_TOKEN_SYMBOL}.` }
     : leverageSlippageElements.drawer;
 
   const allowSubmit = account.isConnected

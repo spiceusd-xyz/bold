@@ -11,7 +11,7 @@ import { useAccount } from "@/src/services/Ethereum";
 import { usePrice } from "@/src/services/Prices";
 import { useTransactionFlow } from "@/src/services/TransactionFlow";
 import { css } from "@/styled-system/css";
-import { Button, HFlex, TokenIcon, VFlex } from "@liquity2/uikit";
+import { BOLD_TOKEN_SYMBOL, Button, HFlex, TokenIcon, VFlex } from "@liquity2/uikit";
 import * as dn from "dnum";
 
 export function PanelClaimRewards({
@@ -29,7 +29,7 @@ export function PanelClaimRewards({
     throw new Error(`Invalid collateral index: ${collIndex}`);
   }
 
-  const boldPriceUsd = usePrice("BOLD");
+  const boldPriceUsd = usePrice(BOLD_TOKEN_SYMBOL);
   const collPriceUsd = usePrice(collateral.symbol ?? null);
 
   const totalRewards = collPriceUsd && boldPriceUsd && dn.add(
@@ -47,7 +47,7 @@ export function PanelClaimRewards({
         <Rewards
           amount={position?.rewards?.bold ?? DNUM_0}
           label={content.earnScreen.rewardsPanel.boldRewardsLabel}
-          symbol="BOLD"
+          symbol={BOLD_TOKEN_SYMBOL}
         />
         <Rewards
           amount={position?.rewards?.coll ?? DNUM_0}

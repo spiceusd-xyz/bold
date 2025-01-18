@@ -22,6 +22,7 @@ import { useTransactionFlow } from "@/src/services/TransactionFlow";
 import { riskLevelToStatusMode } from "@/src/uikit-utils";
 import { css } from "@/styled-system/css";
 import {
+  BOLD_TOKEN_SYMBOL,
   Button,
   Checkbox,
   HFlex,
@@ -271,7 +272,7 @@ export function PanelUpdateLeveragePosition({
               drawer={newLoanDetails.debt && dn.lt(newLoanDetails.debt, MIN_DEBT)
                 ? {
                   mode: "error",
-                  message: `You must borrow at least ${fmtnum(MIN_DEBT, 2)} BOLD.`,
+                  message: `You must borrow at least ${fmtnum(MIN_DEBT, 2)} ${BOLD_TOKEN_SYMBOL}.`,
                 }
                 : null}
               {...leverageField}
@@ -341,11 +342,11 @@ export function PanelUpdateLeveragePosition({
                 <ValueUpdate
                   fontSize={14}
                   before={initialLoanDetails.debt && (
-                    `${fmtnum(initialLoanDetails.debt)} BOLD`
+                    `${fmtnum(initialLoanDetails.debt)} ${BOLD_TOKEN_SYMBOL}`
                   )}
                   after={newLoanDetails.debt && dn.gt(newLoanDetails.debt, 0)
                     ? (
-                      `${fmtnum(newLoanDetails.debt)} BOLD`
+                      `${fmtnum(newLoanDetails.debt)} ${BOLD_TOKEN_SYMBOL}`
                     )
                     : (
                       `N/A`
