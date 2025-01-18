@@ -92,11 +92,13 @@ type CollateralContracts = {
   [K in CollateralContractName]: Contract<K>;
 };
 
-type Collaterals = Array<{
+export type Collateral = {
   collIndex: CollIndex;
   contracts: CollateralContracts;
   symbol: CollateralSymbol;
-}>;
+}
+
+type Collaterals = Array<Collateral>;
 
 export type Contracts = ProtocolContractMap & {
   collaterals: Collaterals;

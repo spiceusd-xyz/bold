@@ -70,3 +70,5 @@ export const REDEMPTION_RISK: Record<Exclude<RiskLevel, "high">, number> = {
   medium: 3.5 / 100,
   low: 5 / 100,
 };
+
+export const CONTRACT_USDB_TOKEN = '0x4300000000000000000000000000000000000003';

@@ -4,7 +4,7 @@ import { CollateralSymbol, Entries } from "@/src/types";
 import type { Dnum } from "dnum";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 
-import { getCollateralContract } from "@/src/contracts";
+import { getCollateralContract, getContracts } from "@/src/contracts";
 import {
   BOLD_PRICE as DEMO_BOLD_PRICE,
   ETH_PRICE as DEMO_ETH_PRICE,
@@ -17,13 +17,16 @@ import {
   WSTETH_PRICE as DEMO_WSTETH_PRICE,
 } from "@/src/demo-mode";
 import { dnum18, jsonStringifyWithDnum } from "@/src/dnum-utils";
-import { COLL_SYMBOLS, DEMO_MODE } from "@/src/env";
+import { COLL_SYMBOLS, CONTRACT_BOLD_TOKEN, CONTRACT_LQTY_TOKEN, CONTRACT_LUSD_TOKEN, DEMO_MODE } from "@/src/env";
 import { useQuery } from "@tanstack/react-query";
 import * as dn from "dnum";
 import { createContext, useContext, useEffect, useState } from "react";
 import { useRef } from "react";
 import * as v from "valibot";
 import { useReadContract } from "wagmi";
+import { NrERC20 } from "../abi/NrERC20";
+import { isCollateralSymbol, Token } from "@liquity2/uikit";
+import { match } from "ts-pattern";
 
 type PriceToken = "LQTY" | "BOLD" | "LUSD" | CollateralSymbol;
 
@@ -203,9 +206,57 @@ export function useAllPrices() {
   return prices;
 }
 
+function getTokenAddress(token: Token["symbol"] | undefined,) {
+  const contracts = getContracts();
+  return match(token)
+    .when(
+      (symbol) => Boolean(symbol && isCollateralSymbol(symbol)),
+      (symbol) => {
+        if (!symbol || !isCollateralSymbol(symbol)) {
+          return null;
+        }
+        const collateral = contracts.collaterals.find((c) => c.symbol === symbol);
+        return collateral?.contracts.CollToken.address ?? null;
+      },
+    )
+    .with("BOLD", () => CONTRACT_BOLD_TOKEN)
+    .with("LQTY", () => CONTRACT_LQTY_TOKEN)
+    .with("LUSD", () => CONTRACT_LUSD_TOKEN)
+    .otherwise(() => null);
+
+}
+
 export function usePrice(token: PriceToken | null) {
   const { prices } = useContext(PriceContext);
-  return token ? prices[token] : null;
+  const tokenAddress = token && getTokenAddress(token);
+  const isNrERC20Token = ['ETH', 'USDB'].includes(token ?? '');
+
+  const {data: stERC20PerToken} = useReadContract({
+    abi: NrERC20,
+    address: tokenAddress ?? '0x',
+    functionName: 'stERC20PerToken',
+    query: {
+      enabled: !!tokenAddress && isNrERC20Token
+    }
+  })
+
+  const price = (() => {
+    if (!token) {
+      return null;
+    }
+    if (isNrERC20Token) {
+      if (!stERC20PerToken || !prices[token]) {
+        return null;
+      }
+      const nrERC20Price = prices[token];
+      const stERC20Price = dn.div(dn.mul(nrERC20Price, 1000000000n), stERC20PerToken);;
+
+      return stERC20Price;
+    }
+    return prices[token];
+  })();
+
+  return price;
 }
 
 export function useUpdatePrice() {

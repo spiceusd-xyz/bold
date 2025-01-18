@@ -56,6 +56,7 @@ import {
   useReadContract,
   WagmiProvider,
 } from "wagmi";
+import { CONTRACT_USDB_TOKEN } from "../constants";
 
 const queryClient = new QueryClient();
 
@@ -101,12 +102,15 @@ export function useBalance(
   const demoMode = useDemoMode();
   const contracts = getContracts();
 
-  const tokenAddress = match(token)
+  const tokenBalanceAddress = match(token)
     .when(
       (symbol) => Boolean(symbol && isCollateralSymbol(symbol) && symbol !== "ETH"),
       (symbol) => {
         if (!symbol || !isCollateralSymbol(symbol) || symbol === "ETH") {
           return null;
+        }
+        if (symbol === 'USDB') {
+          return CONTRACT_USDB_TOKEN;
         }
         const collateral = contracts.collaterals.find((c) => c.symbol === symbol);
         return collateral?.contracts.CollToken.address ?? null;
@@ -118,7 +122,7 @@ export function useBalance(
     .otherwise(() => null);
 
   const tokenBalance = useReadContract({
-    address: tokenAddress ?? undefined,
+    address: tokenBalanceAddress ?? undefined,
     abi: erc20Abi,
     functionName: "balanceOf",
     args: address && [address],

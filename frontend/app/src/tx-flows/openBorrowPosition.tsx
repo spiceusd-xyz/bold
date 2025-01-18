@@ -1,7 +1,7 @@
 import type { FlowDeclaration } from "@/src/services/TransactionFlow";
 
 import { Amount } from "@/src/comps/Amount/Amount";
-import { ETH_GAS_COMPENSATION } from "@/src/constants";
+import { CONTRACT_USDB_TOKEN, ETH_GAS_COMPENSATION } from "@/src/constants";
 import { dnum18 } from "@/src/dnum-utils";
 import { fmtnum } from "@/src/formatting";
 import { getCollToken, getPrefixedTroveId, usePredictOpenTroveUpfrontFee } from "@/src/liquity-utils";
@@ -16,6 +16,7 @@ import * as dn from "dnum";
 import * as v from "valibot";
 import { parseEventLogs } from "viem";
 import { readContract } from "wagmi/actions";
+import { Collateral } from "../contracts";
 
 const FlowIdSchema = v.literal("openBorrowPosition");
 
@@ -59,6 +60,10 @@ type Step =
   | "approveLst"
   | "openTroveEth"
   | "openTroveLst";
+
+function getApprovalAddress (collateral: Collateral) {
+  return collateral.symbol === 'USDB' ? CONTRACT_USDB_TOKEN :  collateral.contracts.CollToken.address;
+}
 
 export const openBorrowPosition: FlowDeclaration<Request, Step> = {
   title: "Review & Send Transaction",
@@ -197,6 +202,8 @@ export const openBorrowPosition: FlowDeclaration<Request, Step> = {
 
     const { LeverageLSTZapper, CollToken } = collateral.contracts;
 
+    const approvalAddress = getApprovalAddress(collateral);
+
     if (!LeverageLSTZapper || !CollToken) {
       throw new Error(`Collateral ${collateral.symbol} not supported`);
     }
@@ -204,6 +211,7 @@ export const openBorrowPosition: FlowDeclaration<Request, Step> = {
     const allowance = dnum18(
       await readContract(wagmiConfig, {
         ...CollToken,
+        address: approvalAddress,
         functionName: "allowance",
         args: [
           account.address ?? ADDRESS_ZERO,
@@ -260,19 +268,21 @@ export const openBorrowPosition: FlowDeclaration<Request, Step> = {
 
   async writeContractParams(stepId, { contracts, request }) {
     const collateral = contracts.collaterals[request.collIndex];
-
+    
     const { LeverageLSTZapper, CollToken } = collateral.contracts;
     if (!LeverageLSTZapper || !CollToken) {
       throw new Error(`Collateral ${collateral.symbol} not supported`);
     }
-
+    
     if (stepId === "approveLst") {
+      const approvalAddress = getApprovalAddress(collateral);
       return {
         ...CollToken,
+        address: approvalAddress,
         functionName: "approve" as const,
         args: [
           LeverageLSTZapper.address,
-          request.collAmount[0],
+          dn.add(request.collAmount, ETH_GAS_COMPENSATION)[0],
         ],
       };
     }
