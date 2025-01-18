@@ -1,4 +1,4 @@
-import type { BOLDTokenSymbol, Token } from "./types";
+import type { Token } from "./types";
 
 import tokenBold from "./token-icons/bold.svg";
 import tokenEth from "./token-icons/eth.svg";
@@ -7,7 +7,7 @@ import tokenLusd from "./token-icons/lusd.svg";
 import tokenReth from "./token-icons/reth.svg";
 import tokenSteth from "./token-icons/wsteth.svg";
 
-export const BOLD_TOKEN_SYMBOL : BOLDTokenSymbol = 'BOLD';
+export const BOLD_TOKEN_SYMBOL = 'BOLD';
 
 export type CollateralSymbols = ["ETH", "RETH", "WSTETH"];
 
@@ -68,7 +68,7 @@ export const COLLATERALS: CollateralToken[] = [
 ];
 
 export const TOKENS_BY_SYMBOL = {
-  BOLD,
+  [BOLD_TOKEN_SYMBOL]: BOLD,
   ETH,
   LQTY,
   RETH,

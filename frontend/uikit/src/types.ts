@@ -1,10 +1,10 @@
-import { CollateralSymbol } from "./tokens";
+import { BOLD_TOKEN_SYMBOL, CollateralSymbol } from "./tokens";
 
 export type Address = `0x${string}`;
 
 export type Direction = -1 | 1;
 
-export type BOLDTokenSymbol = "BOLD";
+export type BOLDTokenSymbol = typeof BOLD_TOKEN_SYMBOL;
 
 export type TokenSymbol =
   | BOLDTokenSymbol

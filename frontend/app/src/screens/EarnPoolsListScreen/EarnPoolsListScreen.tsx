@@ -1,6 +1,6 @@
 "use client";
 
-import type { CollIndex } from "@/src/types";
+import type { CollIndex, TokenSymbol } from "@/src/types";
 
 import { EarnPositionSummary } from "@/src/comps/EarnPositionSummary/EarnPositionSummary";
 import { Screen } from "@/src/comps/Screen/Screen";
@@ -44,7 +44,7 @@ export function EarnPoolsListScreen() {
                 {[BOLD_TOKEN_SYMBOL, ...collaterals.map((coll) => coll.symbol)].map((symbol) => (
                   <TokenIcon
                     key={symbol}
-                    symbol={symbol}
+                    symbol={symbol as TokenSymbol}
                   />
                 ))}
               </TokenIcon.Group>,
