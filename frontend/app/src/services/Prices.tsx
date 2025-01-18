@@ -17,7 +17,7 @@ import {
   WSTETH_PRICE as DEMO_WSTETH_PRICE,
 } from "@/src/demo-mode";
 import { dnum18, jsonStringifyWithDnum } from "@/src/dnum-utils";
-import { COLL_SYMBOLS, CONTRACT_BOLD_TOKEN, CONTRACT_LQTY_TOKEN, CONTRACT_LUSD_TOKEN, DEMO_MODE } from "@/src/env";
+import { COLL_SYMBOLS, DEMO_MODE } from "@/src/env";
 import { useQuery } from "@tanstack/react-query";
 import * as dn from "dnum";
 import { createContext, useContext, useEffect, useState } from "react";
@@ -25,8 +25,7 @@ import { useRef } from "react";
 import * as v from "valibot";
 import { useReadContract } from "wagmi";
 import { NrERC20 } from "../abi/NrERC20";
-import { isCollateralSymbol, Token, BOLD_TOKEN_SYMBOL, BOLDTokenSymbol } from "@liquity2/uikit";
-import { match } from "ts-pattern";
+import { BOLD_TOKEN_SYMBOL, BOLDTokenSymbol } from "@liquity2/uikit";
 
 type PriceToken = "LQTY" | BOLDTokenSymbol | "LUSD" | CollateralSymbol;
 
@@ -45,9 +44,16 @@ const initialPrices: Prices = {
 
 const PRICE_REFRESH_INTERVAL = 60_000;
 
+function getCollateralTokenAddress(token: CollateralSymbol) {
+  const contracts = getContracts();
+  const collateral = contracts.collaterals.find((c) => c.symbol === token);
+  return collateral?.contracts.CollToken.address ?? null;
+}
+
 function useWatchCollateralPrice(collateral: CollateralSymbol) {
   const PriceFeed = getCollateralContract(collateral, "PriceFeed");
-  return useReadContract({
+
+  const {data: rawPrice} = useReadContract({
     ...(PriceFeed as NonNullable<typeof PriceFeed>),
     functionName: "lastGoodPrice",
     query: {
@@ -55,6 +61,31 @@ function useWatchCollateralPrice(collateral: CollateralSymbol) {
       refetchInterval: PRICE_REFRESH_INTERVAL,
     },
   });
+
+  const nrTokenAddress =  getCollateralTokenAddress(collateral);
+  const isNrERC20Token = ['ETH', 'USDB'].includes(collateral ?? '');
+
+  const {data: stERC20PerToken} = useReadContract({
+    abi: NrERC20,
+    address: nrTokenAddress ?? '0x',
+    functionName: 'stERC20PerToken',
+    query: {
+      enabled: isNrERC20Token && !!nrTokenAddress
+    }
+  })
+
+  if (!isNrERC20Token) {
+    return rawPrice;
+  }
+
+  if (rawPrice === undefined || stERC20PerToken === undefined) {
+    return undefined;
+  }
+
+  const nrTokenPrice = rawPrice;
+  const stTokenPrice = dn.div(dn.mul(nrTokenPrice, BigInt(1e9)), stERC20PerToken)[0];
+
+  return stTokenPrice;
 }
 
 const coinGeckoTokenIds = {
@@ -131,7 +162,7 @@ let useWatchPrices = function useWatchPrices(callback: (prices: Prices) => void)
       LQTY: lqtyPrice.data ? dn.from(lqtyPrice.data, 18) : null,
       LUSD: lusdPrice.data ? dn.from(lusdPrice.data, 18) : null,
       ...Object.fromEntries(
-        COLL_SYMBOLS.map(symbol => [symbol, collateralPriceMap[symbol].data ? dnum18(collateralPriceMap[symbol].data) : null])
+        COLL_SYMBOLS.map(symbol => [symbol, collateralPriceMap[symbol] ? dnum18(collateralPriceMap[symbol]) : null])
       )
     } as Prices
 
@@ -206,57 +237,9 @@ export function useAllPrices() {
   return prices;
 }
 
-function getTokenAddress(token: Token["symbol"] | undefined,) {
-  const contracts = getContracts();
-  return match(token)
-    .when(
-      (symbol) => Boolean(symbol && isCollateralSymbol(symbol)),
-      (symbol) => {
-        if (!symbol || !isCollateralSymbol(symbol)) {
-          return null;
-        }
-        const collateral = contracts.collaterals.find((c) => c.symbol === symbol);
-        return collateral?.contracts.CollToken.address ?? null;
-      },
-    )
-    .with(BOLD_TOKEN_SYMBOL, () => CONTRACT_BOLD_TOKEN)
-    .with("LQTY", () => CONTRACT_LQTY_TOKEN)
-    .with("LUSD", () => CONTRACT_LUSD_TOKEN)
-    .otherwise(() => null);
-
-}
-
 export function usePrice(token: PriceToken | null) {
   const { prices } = useContext(PriceContext);
-  const tokenAddress = token && getTokenAddress(token);
-  const isNrERC20Token = ['ETH', 'USDB'].includes(token ?? '');
-
-  const {data: stERC20PerToken} = useReadContract({
-    abi: NrERC20,
-    address: tokenAddress ?? '0x',
-    functionName: 'stERC20PerToken',
-    query: {
-      enabled: !!tokenAddress && isNrERC20Token
-    }
-  })
-
-  const price = (() => {
-    if (!token) {
-      return null;
-    }
-    if (isNrERC20Token) {
-      if (!stERC20PerToken || !prices[token]) {
-        return null;
-      }
-      const nrERC20Price = prices[token];
-      const stERC20Price = dn.div(dn.mul(nrERC20Price, 1000000000n), stERC20PerToken);;
-
-      return stERC20Price;
-    }
-    return prices[token];
-  })();
-
-  return price;
+  return token ? prices[token] : null;
 }
 
 export function useUpdatePrice() {
