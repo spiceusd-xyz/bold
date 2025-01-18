@@ -219,7 +219,7 @@ function getTokenAddress(token: Token["symbol"] | undefined,) {
         return collateral?.contracts.CollToken.address ?? null;
       },
     )
-    .with("BOLD", () => CONTRACT_BOLD_TOKEN)
+    .with(BOLD_TOKEN_SYMBOL, () => CONTRACT_BOLD_TOKEN)
     .with("LQTY", () => CONTRACT_LQTY_TOKEN)
     .with("LUSD", () => CONTRACT_LUSD_TOKEN)
     .otherwise(() => null);
