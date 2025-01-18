@@ -10,7 +10,7 @@ import tokenFnx from "./token-icons/FNX.png";
 import tokenHyper from "./token-icons/HYPER.png";
 import tokenThrust from "./token-icons/THRUSTER.png";
 
-export const BOLD_TOKEN_SYMBOL = 'BOLD';
+export const BOLD_TOKEN_SYMBOL = 'SUSD';
 
 export type CollateralSymbols = ["ETH", "USDB", "BLAST", "FNX", "HYPER", "THRUST"];
 
