@@ -14,6 +14,7 @@ import * as dn from "dnum";
 import { match, P } from "ts-pattern";
 import * as v from "valibot";
 import { readContract } from "wagmi/actions";
+import { BOLD_TOKEN_SYMBOL } from "@liquity2/uikit";
 
 const FlowIdSchema = v.literal("updateBorrowPosition");
 
@@ -51,7 +52,7 @@ type Step =
   | "approveColl";
 
 const stepNames: Record<Step, string> = {
-  approveBold: "Approve BOLD",
+  approveBold: `Approve ${BOLD_TOKEN_SYMBOL}`,
   approveColl: "Approve {collSymbol}",
   adjustTrove: "Update Position",
   depositBold: "Update Position",
@@ -185,7 +186,7 @@ export const updateBorrowPosition: FlowDeclaration<Request, Step> = {
                 key="start"
                 fallback="…"
                 value={debtChangeWithFee && dn.abs(debtChangeWithFee)}
-                suffix=" BOLD"
+                suffix={` ${BOLD_TOKEN_SYMBOL}`}
               />,
               upfrontFeeData.data?.upfrontFee && dn.gt(upfrontFeeData.data.upfrontFee, 0n) && (
                 <Amount
@@ -193,7 +194,7 @@ export const updateBorrowPosition: FlowDeclaration<Request, Step> = {
                   fallback="…"
                   prefix="Incl. "
                   value={upfrontFeeData.data.upfrontFee}
-                  suffix=" BOLD interest rate adjustment fee"
+                  suffix={` ${BOLD_TOKEN_SYMBOL} interest rate adjustment fee`}
                 />
               ),
             ]}

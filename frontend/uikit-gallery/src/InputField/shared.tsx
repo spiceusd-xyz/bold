@@ -2,7 +2,7 @@
 
 import type { ComponentProps, ReactNode } from "react";
 
-import { Dropdown, InputField, PillButton, Slider, TextButton, TokenIcon } from "@liquity2/uikit";
+import { BOLD_TOKEN_SYMBOL, BOLDTokenSymbol, Dropdown, InputField, PillButton, Slider, TextButton, TokenIcon } from "@liquity2/uikit";
 import * as dn from "dnum";
 import { useState } from "react";
 import { useFixtureInput } from "react-cosmos/client";
@@ -78,7 +78,7 @@ export function InputFieldFixture({
         ]}
       />
     ))
-    .with("borrow", () => <Token name="BOLD" />)
+    .with("borrow", () => <Token name={BOLD_TOKEN_SYMBOL} />)
     .with("slider", () => (
       <div
         style={{
@@ -103,7 +103,7 @@ export function InputFieldFixture({
   const secondaryStart = match(fixture)
     .with("deposit", () => `${parsedValue ? dn.format(dn.mul(parsedValue, ETH_PRICE_USD), 2) : "−"}  USD`)
     .with("borrow", () => `${parsedValue ? dn.format(parsedValue, 2) : "−"}  USD`)
-    .with("slider", () => "Total debt 0 BOLD")
+    .with("slider", () => `Total debt 0 ${BOLD_TOKEN_SYMBOL}`)
     .otherwise(() => undefined);
 
   const secondaryEnd = match(fixture)
@@ -128,7 +128,7 @@ export function InputFieldFixture({
           Max LTV 80%:
         </div>
         <TextButton
-          label="24,405.69 BOLD"
+          label={`24,405.69 ${BOLD_TOKEN_SYMBOL}`}
           onClick={() => setValue("24405.69")}
         />
       </div>
@@ -164,7 +164,7 @@ export function InputFieldFixture({
       (focused || !parsedValue) ? value : `${dn.format(parsedValue)} ETH`
     ))
     .with("borrow", () => (
-      (focused || !parsedValue) ? value : `${dn.format(parsedValue)} BOLD`
+      (focused || !parsedValue) ? value : `${dn.format(parsedValue)} ${BOLD_TOKEN_SYMBOL}`
     ))
     .with("slider", () => (
       (focused || !parsedValue) ? value : `$${dn.format(parsedValue)}`
@@ -206,12 +206,12 @@ export function InputFieldFixture({
   );
 }
 
-function Token({ name }: { name: "ETH" | "BOLD" }) {
+function Token({ name }: { name: "ETH" | BOLDTokenSymbol }) {
   return (
     <Action
       icon={match(name)
         .with("ETH", () => <IconEth />)
-        .with("BOLD", () => <IconBold />)
+        .with(BOLD_TOKEN_SYMBOL, () => <IconBold />)
         .exhaustive()}
       label={name}
     />

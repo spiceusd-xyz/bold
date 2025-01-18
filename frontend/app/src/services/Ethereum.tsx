@@ -27,7 +27,7 @@ import {
   WALLET_CONNECT_PROJECT_ID,
 } from "@/src/env";
 import { noop } from "@/src/utils";
-import { isCollateralSymbol, useTheme } from "@liquity2/uikit";
+import { BOLD_TOKEN_SYMBOL, isCollateralSymbol, useTheme } from "@liquity2/uikit";
 import {
   getDefaultConfig,
   lightTheme,
@@ -112,7 +112,7 @@ export function useBalance(
         return collateral?.contracts.CollToken.address ?? null;
       },
     )
-    .with("BOLD", () => CONTRACT_BOLD_TOKEN)
+    .with(BOLD_TOKEN_SYMBOL, () => CONTRACT_BOLD_TOKEN)
     .with("LQTY", () => CONTRACT_LQTY_TOKEN)
     .with("LUSD", () => CONTRACT_LUSD_TOKEN)
     .otherwise(() => null);

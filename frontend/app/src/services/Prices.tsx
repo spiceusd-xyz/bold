@@ -24,13 +24,14 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { useRef } from "react";
 import * as v from "valibot";
 import { useReadContract } from "wagmi";
+import { BOLD_TOKEN_SYMBOL, BOLDTokenSymbol } from "@liquity2/uikit";
 
-type PriceToken = "LQTY" | "BOLD" | "LUSD" | CollateralSymbol;
+type PriceToken = "LQTY" | BOLDTokenSymbol | "LUSD" | CollateralSymbol;
 
 type Prices = Record<PriceToken, Dnum | null>;
 
 const initialPrices: Prices = {
-  BOLD: dn.from(1, 18),
+  [BOLD_TOKEN_SYMBOL]: dn.from(1, 18),
   LQTY: null,
   LUSD: dn.from(1, 18),
 
@@ -116,7 +117,7 @@ let useWatchPrices = function useWatchPrices(callback: (prices: Prices) => void)
 
   // @ts-ignore
   const prevPrices = useRef<Prices>({
-    BOLD: null,
+    [BOLD_TOKEN_SYMBOL]: null,
     LQTY: null,
     LUSD: null,
     ...Object.fromEntries(COLL_SYMBOLS.map(symbol => [symbol, null])),
@@ -124,7 +125,7 @@ let useWatchPrices = function useWatchPrices(callback: (prices: Prices) => void)
 
   useEffect(() => {
     const newPrices = {
-      BOLD: dn.from(1, 18), // TODO
+      [BOLD_TOKEN_SYMBOL]: dn.from(1, 18), // TODO
       LQTY: lqtyPrice.data ? dn.from(lqtyPrice.data, 18) : null,
       LUSD: lusdPrice.data ? dn.from(lusdPrice.data, 18) : null,
       ...Object.fromEntries(
@@ -155,7 +156,7 @@ if (DEMO_MODE) {
       const update = () => {
         const variation = () => dn.from((Math.random() - 0.5) * DEMO_PRICE_UPDATE_VARIATION, 18);
         callback({
-          BOLD: dn.add(DEMO_BOLD_PRICE, dn.mul(DEMO_BOLD_PRICE, variation())),
+          [BOLD_TOKEN_SYMBOL]: dn.add(DEMO_BOLD_PRICE, dn.mul(DEMO_BOLD_PRICE, variation())),
           LQTY: dn.add(DEMO_LQTY_PRICE, dn.mul(DEMO_LQTY_PRICE, variation())),
           LUSD: dn.add(DEMO_LUSD_PRICE, dn.mul(DEMO_LUSD_PRICE, variation())),
           // @ts-ignore

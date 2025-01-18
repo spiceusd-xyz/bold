@@ -4,8 +4,10 @@ export type Address = `0x${string}`;
 
 export type Direction = -1 | 1;
 
+export type BOLDTokenSymbol = "BOLD";
+
 export type TokenSymbol =
-  | "BOLD"
+  | BOLDTokenSymbol
   | "LQTY"
   | "LUSD"
   | CollateralSymbol;

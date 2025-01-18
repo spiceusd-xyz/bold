@@ -8,7 +8,7 @@ import { getCollToken, shortenTroveId } from "@/src/liquity-utils";
 import { usePrice } from "@/src/services/Prices";
 import { riskLevelToStatusMode } from "@/src/uikit-utils";
 import { css } from "@/styled-system/css";
-import { HFlex, IconBorrow, StatusDot, TokenIcon } from "@liquity2/uikit";
+import { BOLD_TOKEN_SYMBOL, HFlex, IconBorrow, StatusDot, TokenIcon } from "@liquity2/uikit";
 import * as dn from "dnum";
 import Link from "next/link";
 import { PositionCard } from "./PositionCard";
@@ -48,7 +48,7 @@ export function PositionCardBorrow({
   const title = token
     ? [
       `Loan ID: ${shortenTroveId(troveId)}…`,
-      `Borrowed: ${fmtnum(borrowed, "full")} BOLD`,
+      `Borrowed: ${fmtnum(borrowed, "full")} ${BOLD_TOKEN_SYMBOL}`,
       `Collateral: ${fmtnum(deposit, "full")} ${token.name}`,
       `Interest rate: ${fmtnum(interestRate, "full", 100)}%`,
     ]
@@ -71,7 +71,7 @@ export function PositionCardBorrow({
               color: "positionContent",
             })}
           >
-            <div>BOLD loan</div>
+            <div>{BOLD_TOKEN_SYMBOL} loan</div>
             {statusTag}
           </div>
         }
@@ -90,7 +90,7 @@ export function PositionCardBorrow({
               {fmtnum(borrowed)}
               <TokenIcon
                 size={24}
-                symbol="BOLD"
+                symbol={BOLD_TOKEN_SYMBOL}
               />
             </HFlex>
           ),

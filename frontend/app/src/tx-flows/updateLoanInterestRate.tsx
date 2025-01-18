@@ -13,7 +13,7 @@ import { graphQuery, TroveByIdQuery } from "@/src/subgraph-queries";
 import { isTroveId } from "@/src/types";
 import { vPositionLoanCommited } from "@/src/valibot-utils";
 import { css } from "@/styled-system/css";
-import { ADDRESS_ZERO } from "@liquity2/uikit";
+import { ADDRESS_ZERO, BOLD_TOKEN_SYMBOL } from "@liquity2/uikit";
 import * as dn from "dnum";
 import { match, P } from "ts-pattern";
 import * as v from "valibot";
@@ -107,7 +107,7 @@ export const updateLoanInterestRate: FlowDeclaration<Request, Step> = {
           value={[
             <AccountButton key="start" address={loan.batchManager} />,
             <div key="end">
-              {fmtnum(loan.interestRate, "full", 100)}% (~{fmtnum(yearlyBoldInterest, 4)} BOLD per year)
+              {fmtnum(loan.interestRate, "full", 100)}% (~{fmtnum(yearlyBoldInterest, 4)} {BOLD_TOKEN_SYMBOL} per year)
             </div>,
           ]}
         />
@@ -122,9 +122,9 @@ export const updateLoanInterestRate: FlowDeclaration<Request, Step> = {
               </div>,
               <div
                 key="end"
-                title={`${fmtnum(yearlyBoldInterest, "full")} BOLD per year`}
+                title={`${fmtnum(yearlyBoldInterest, "full")} ${BOLD_TOKEN_SYMBOL} per year`}
               >
-                ~{fmtnum(yearlyBoldInterest, 4)} BOLD per year
+                ~{fmtnum(yearlyBoldInterest, 4)} {BOLD_TOKEN_SYMBOL} per year
               </div>,
             ]}
           />
@@ -149,7 +149,7 @@ export const updateLoanInterestRate: FlowDeclaration<Request, Step> = {
                   {fmtnum(prevLoan.interestRate, "full", 100)}% (~{fmtnum(
                     dn.mul(prevLoan.borrowed, prevLoan.interestRate),
                     4,
-                  )} BOLD per year)
+                  )} {BOLD_TOKEN_SYMBOL} per year)
                 </div>,
               ]}
             />
@@ -161,7 +161,7 @@ export const updateLoanInterestRate: FlowDeclaration<Request, Step> = {
                 key="start"
                 fallback="…"
                 value={upfrontFee.data}
-                suffix=" BOLD"
+                suffix={` ${BOLD_TOKEN_SYMBOL}`}
               />,
             ]}
           />

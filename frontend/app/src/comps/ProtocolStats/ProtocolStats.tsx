@@ -7,12 +7,12 @@ import { useAccount } from "@/src/services/Ethereum";
 import { useAllPrices } from "@/src/services/Prices";
 import { useTotalDeposited } from "@/src/subgraph-hooks";
 import { css } from "@/styled-system/css";
-import { AnchorTextButton, HFlex, shortenAddress, TokenIcon } from "@liquity2/uikit";
+import { AnchorTextButton, BOLD_TOKEN_SYMBOL, HFlex, shortenAddress, TokenIcon } from "@liquity2/uikit";
 import { blo } from "blo";
 import * as dn from "dnum";
 import Image from "next/image";
 
-const DISPLAYED_PRICES = ["LQTY", "BOLD", "ETH"] as const;
+const DISPLAYED_PRICES = ["LQTY", BOLD_TOKEN_SYMBOL, "ETH"] as const;
 
 export function ProtocolStats() {
   const account = useAccount();

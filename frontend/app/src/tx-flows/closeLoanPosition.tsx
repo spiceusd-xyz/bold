@@ -10,7 +10,7 @@ import { TransactionDetailsRow } from "@/src/screens/TransactionsScreen/Transact
 import { usePrice } from "@/src/services/Prices";
 import { graphQuery, TroveByIdQuery } from "@/src/subgraph-queries";
 import { vPositionLoanCommited } from "@/src/valibot-utils";
-import { ADDRESS_ZERO } from "@liquity2/uikit";
+import { ADDRESS_ZERO, BOLD_TOKEN_SYMBOL } from "@liquity2/uikit";
 import * as dn from "dnum";
 import * as v from "valibot";
 import { readContract } from "wagmi/actions";
@@ -45,7 +45,7 @@ type Step =
   | "approveBold";
 
 const stepNames: Record<Step, string> = {
-  approveBold: "Approve BOLD",
+  approveBold: `Approve ${BOLD_TOKEN_SYMBOL}`,
   closeLoanPosition: "Close loan",
   closeLoanPositionFromCollateral: "Close loan",
 };
@@ -98,7 +98,7 @@ export const closeLoanPosition: FlowDeclaration<Request, Step> = {
             <Amount
               key="start"
               value={amountToRepay}
-              suffix={` ${repayWithCollateral ? collateral.symbol : "BOLD"}`}
+              suffix={` ${repayWithCollateral ? collateral.symbol : BOLD_TOKEN_SYMBOL}`}
             />,
           ]}
         />

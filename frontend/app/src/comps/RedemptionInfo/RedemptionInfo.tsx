@@ -1,13 +1,13 @@
 import content from "@/src/content";
 import { css } from "@/styled-system/css";
-import { AnchorTextButton, IconExternal } from "@liquity2/uikit";
+import { AnchorTextButton, BOLD_TOKEN_SYMBOL, IconExternal } from "@liquity2/uikit";
 import { a, useInView, useTransition } from "@react-spring/web";
 import { memo } from "react";
 
 const { title, subtitle, infoItems, learnMore } = content.redemptionInfo;
 
 const iconComponents = {
-  bold: BoldIcon,
+  [BOLD_TOKEN_SYMBOL]: BoldIcon,
   redemption: RedemptionIcon,
   interest: InterestIcon,
 } as const;

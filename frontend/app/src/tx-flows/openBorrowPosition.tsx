@@ -11,7 +11,7 @@ import { usePrice } from "@/src/services/Prices";
 import { graphQuery, TroveByIdQuery } from "@/src/subgraph-queries";
 import { isTroveId } from "@/src/types";
 import { vAddress, vCollIndex, vDnum } from "@/src/valibot-utils";
-import { ADDRESS_ZERO, COLLATERALS as KNOWN_COLLATERALS, shortenAddress } from "@liquity2/uikit";
+import { ADDRESS_ZERO, BOLD_TOKEN_SYMBOL, COLLATERALS as KNOWN_COLLATERALS, shortenAddress } from "@liquity2/uikit";
 import * as dn from "dnum";
 import * as v from "valibot";
 import { parseEventLogs } from "viem";
@@ -127,14 +127,14 @@ export const openBorrowPosition: FlowDeclaration<Request, Step> = {
               key="start"
               fallback="…"
               value={boldAmountWithFee}
-              suffix=" BOLD"
+              suffix={` ${BOLD_TOKEN_SYMBOL}`}
             />,
             <Amount
               key="end"
               fallback="…"
               prefix="Incl. "
               value={upfrontFee.data}
-              suffix=" BOLD interest rate adjustment fee"
+              suffix={` ${BOLD_TOKEN_SYMBOL} interest rate adjustment fee`}
             />,
           ]}
         />
@@ -150,7 +150,7 @@ export const openBorrowPosition: FlowDeclaration<Request, Step> = {
               key="end"
               fallback="…"
               value={boldAmountWithFee && dn.mul(boldAmountWithFee, request.annualInterestRate)}
-              suffix=" BOLD per year"
+              suffix={` ${BOLD_TOKEN_SYMBOL} per year`}
             />,
           ]}
         />
