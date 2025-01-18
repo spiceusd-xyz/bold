@@ -527,22 +527,22 @@ function LoanCard({
                       </div>
                     }
                     items={[
-                      {
-                        icon: (
-                          <div
-                            className={css({
-                              color: "accent",
-                            })}
-                          >
-                            {mode === "leverage"
-                              ? <IconBorrow size={16} />
-                              : <IconLeverage size={16} />}
-                          </div>
-                        ),
-                        label: mode === "leverage"
-                          ? `Convert to ${BOLD_TOKEN_SYMBOL} loan`
-                          : "Convert to leverage loan",
-                      },
+                      // {
+                      //   icon: (
+                      //     <div
+                      //       className={css({
+                      //         color: "accent",
+                      //       })}
+                      //     >
+                      //       {mode === "leverage"
+                      //         ? <IconBorrow size={16} />
+                      //         : <IconLeverage size={16} />}
+                      //     </div>
+                      //   ),
+                      //   label: mode === "leverage"
+                      //     ? `Convert to ${BOLD_TOKEN_SYMBOL} loan`
+                      //     : "Convert to leverage loan",
+                      // },
                       {
                         icon: (
                           <div
