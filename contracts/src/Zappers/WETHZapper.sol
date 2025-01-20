@@ -36,10 +36,12 @@ contract WETHZapper is BaseZapper {
         INrETH t = INrETH(payable(address(collToken)));
         uint256 shares = t.getNrERC20ByStERC20(_amount);
         uint256 wrapAmount = t.getStERC20ByNrERC20(shares);
+        WETH.deposit{value: wrapAmount}();
         WETH.approve(address(collToken), wrapAmount);
         uint256 remains = _amount - wrapAmount;
         if (remains > 0) {
-            WETH.transfer(msg.sender, _amount - wrapAmount);
+            (bool success, ) = msg.sender.call{value: remains}("");
+            require(success, "WZ: Sending ETH failed");
         }
         return t.wrap(wrapAmount);
     }
@@ -60,7 +62,7 @@ contract WETHZapper is BaseZapper {
         );
 
         // Convert ETH to WETH
-        WETH.deposit{value: msg.value}();
+        WETH.deposit{value: ETH_GAS_COMPENSATION}();
         uint256 amount = _wrapToColl(msg.value - ETH_GAS_COMPENSATION);
 
         uint256 troveId;
@@ -120,7 +122,6 @@ contract WETHZapper is BaseZapper {
         address owner = troveNFT.ownerOf(_troveId);
         _requireSenderIsOwnerOrAddManager(_troveId, owner);
         // Convert ETH to WETH
-        WETH.deposit{value: msg.value}();
         uint256 amount = _wrapToColl(msg.value);
 
         borrowerOperations.addColl(_troveId, amount);
@@ -281,7 +282,6 @@ contract WETHZapper is BaseZapper {
 
         // ETH -> WETH
         if (_isCollIncrease) {
-            WETH.deposit{value: _collChange}();
             _collChange = _wrapToColl(_collChange);
         }
 
