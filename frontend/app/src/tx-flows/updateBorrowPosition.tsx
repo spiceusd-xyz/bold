@@ -15,6 +15,7 @@ import { match, P } from "ts-pattern";
 import * as v from "valibot";
 import { readContract } from "wagmi/actions";
 import { BOLD_TOKEN_SYMBOL } from "@liquity2/uikit";
+import { NrERC20 } from "../abi/NrERC20";
 
 const FlowIdSchema = v.literal("updateBorrowPosition");
 
@@ -254,7 +255,7 @@ export const updateBorrowPosition: FlowDeclaration<Request, Step> = {
     ].filter((step) => step !== null);
   },
 
-  async writeContractParams(stepId, { account, contracts, request }) {
+  async writeContractParams(stepId, { account, contracts, request, wagmiConfig }) {
     const { loan, prevLoan, maxUpfrontFee } = request;
     const collChange = getCollChange(loan, prevLoan);
     const debtChange = getDebtChange(loan, prevLoan);
@@ -291,9 +292,19 @@ export const updateBorrowPosition: FlowDeclaration<Request, Step> = {
       };
     }
 
+    const fetchNrERC20Amount =async (stERC20Amount: bigint) => {
+      const nrERC20Amount = await readContract(wagmiConfig, {
+        abi: NrERC20,
+        address: collateral.contracts.CollToken.address,
+        functionName: 'getNrERC20ByStERC20',
+        args: [stERC20Amount]
+      });
+      return nrERC20Amount;
+    }
+
     // WETH zapper
     if (collateral.symbol === "ETH") {
-      return match(stepId)
+      return await match(stepId)
         .with("adjustTrove", () => ({
           ...LeverageWETHZapper,
           functionName: "adjustTroveWithRawETH",
@@ -311,13 +322,17 @@ export const updateBorrowPosition: FlowDeclaration<Request, Step> = {
           ...LeverageWETHZapper,
           functionName: "addCollWithRawETH",
           args: [troveId],
-          value: dn.abs(collChange)[0],
+          value: dn.abs(collChange)[0] * 1000000000n,
         }))
-        .with("withdrawColl", () => ({
-          ...LeverageWETHZapper,
-          functionName: "withdrawCollToRawETH",
-          args: [troveId, dn.abs(collChange)[0]],
-        }))
+        .with("withdrawColl", async () => {
+          const stERC20Amount = dn.abs(collChange)[0] * 1000000000n;
+          const withdrawAmount = await fetchNrERC20Amount(stERC20Amount);
+          return ({
+            ...LeverageWETHZapper,
+            functionName: "withdrawCollToRawETH",
+            args: [troveId, withdrawAmount],
+          });
+        })
         .with("depositBold", () => ({
           ...LeverageWETHZapper,
           functionName: "repayBold",
@@ -332,7 +347,7 @@ export const updateBorrowPosition: FlowDeclaration<Request, Step> = {
     }
 
     // GasComp zapper
-    return match(stepId)
+    return await match(stepId)
       .with("adjustTrove", () => ({
         ...LeverageLSTZapper,
         functionName: "adjustTrove",
@@ -350,11 +365,19 @@ export const updateBorrowPosition: FlowDeclaration<Request, Step> = {
         functionName: "addColl",
         args: [troveId, dn.abs(collChange)[0]],
       }))
-      .with("withdrawColl", () => ({
-        ...LeverageLSTZapper,
-        functionName: "withdrawColl",
-        args: [troveId, dn.abs(collChange)[0]],
-      }))
+      .with("withdrawColl", async () => {
+        let withdrawAmount = dn.abs(collChange)[0];
+        if (collateral.symbol === 'USDB') {
+          const stERC20Amount = withdrawAmount * 1000000000n;
+          const nrERC20Amount = await fetchNrERC20Amount(stERC20Amount);
+          withdrawAmount = nrERC20Amount;
+        }
+        return ({
+          ...LeverageLSTZapper,
+          functionName: "withdrawColl",
+          args: [troveId, withdrawAmount],
+        });
+      })
       .with("depositBold", () => ({
         ...LeverageLSTZapper,
         functionName: "repayBold",

@@ -13,6 +13,8 @@ import { css } from "@/styled-system/css";
 import { addressesEqual, BOLD_TOKEN_SYMBOL, Button, Dropdown, TokenIcon, TOKENS_BY_SYMBOL, VFlex } from "@liquity2/uikit";
 import * as dn from "dnum";
 import { useState } from "react";
+import { NrERC20 } from "@/src/abi/NrERC20";
+import { useReadContract } from "wagmi";
 
 export function PanelClosePosition({
   loan,
@@ -49,8 +51,24 @@ export function PanelClosePosition({
     ? loan.deposit
     : amountToRepay && dn.sub(loan.deposit, amountToRepay);
 
-  const collToReclaimUsd = collToReclaim && collPriceUsd && dn.mul(
-    collToReclaim,
+  const isNrERC20Token = ['ETH', 'USDB'].includes(collateral.symbol);
+  
+  const {data: stERC20PerToken} = useReadContract({
+    abi: NrERC20,
+    address: collateral.contracts.CollToken.address,
+    functionName: 'stERC20PerToken',
+    query: {
+      enabled: isNrERC20Token,
+    }
+  });
+  const rawUnwrappedCollToReclaim = (stERC20PerToken !== undefined && collToReclaim) ? collToReclaim[0] * stERC20PerToken / BigInt(1e9) : undefined;
+
+  const unwrappedCollToReclaim = rawUnwrappedCollToReclaim !== undefined ? [rawUnwrappedCollToReclaim, 18] as dn.Dnum : undefined;
+
+  const displayedCollToReclaim = isNrERC20Token ? unwrappedCollToReclaim : collToReclaim;
+
+  const collToReclaimUsd = displayedCollToReclaim && collPriceUsd && dn.mul(
+    displayedCollToReclaim,
     collPriceUsd,
   );
 
@@ -177,7 +195,7 @@ export function PanelClosePosition({
                   lineHeight: 1,
                 })}
               >
-                <div>{fmtnum(collToReclaim)}</div>
+                <div>{fmtnum(displayedCollToReclaim)}</div>
               </div>
               <div>
                 <div

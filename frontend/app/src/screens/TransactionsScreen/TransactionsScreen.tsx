@@ -66,6 +66,7 @@ export function TransactionsScreen() {
     currentStep.txStatus === "idle"
     || currentStep.txStatus === "error"
     || currentStep.txStatus === "awaiting-signature"
+    || currentStep.txStatus === "getting-params"
   );
 
   return (
@@ -164,7 +165,8 @@ export function TransactionsScreen() {
               <Button
                 disabled={currentStep.txStatus === "awaiting-confirmation"
                   || currentStep.txStatus === "awaiting-signature"
-                  || currentStep.txStatus === "post-check"}
+                  || currentStep.txStatus === "post-check"
+                  || currentStep.txStatus === 'getting-params'}
                 label={(
                   currentStep.txStatus === "error" ? "Retry: " : ""
                 ) + fd.getStepName(
@@ -185,6 +187,7 @@ export function TransactionsScreen() {
           >
             {match(currentStep.txStatus)
               .with("idle", () => "This action will open your wallet to sign the transaction.")
+              .with("getting-params", () => "Getting transaction params")
               .with("awaiting-signature", () => "Please sign the transaction in your wallet.")
               .with("awaiting-confirmation", () => (
                 <>

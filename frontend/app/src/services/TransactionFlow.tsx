@@ -164,6 +164,15 @@ export const FlowStepsSchema = v.union([
           v.literal("confirmed"),
         ]),
       }),
+      v.object({
+        id: v.string(),
+        error: v.null(),
+        txHash: v.null(),
+        txReceiptData: v.null(),
+        txStatus: v.union([
+          v.literal("getting-params"),
+        ]),
+      }),
     ]),
   ),
 ]);
@@ -186,6 +195,11 @@ type FlowStepUpdate =
     txHash: `0x${string}`;
     txStatus: "post-check" | "confirmed";
     txReceiptData: null | string;
+  } | {
+    error: null;
+    txHash: null;
+    txStatus: 'getting-params';
+    txReceiptData: null;
   };
 
 export type FlowSteps = NonNullable<
@@ -509,6 +523,14 @@ function useTransactionExecution({
   const storedState = useStoredState();
 
   // step status updates
+  const setStepToGettingParams = () => {
+    updateFlowStep(currentStepIndex, {
+      error: null,
+      txHash: null,
+      txReceiptData: null,
+      txStatus: "getting-params",
+    });
+  };
   const setStepToAwaitingSignature = () => {
     updateFlowStep(currentStepIndex, {
       error: null,
@@ -652,14 +674,21 @@ function useTransactionExecution({
       return;
     }
 
-    const writeParams = await flowDeclaration.writeContractParams(currentStepId, {
-      account,
-      contracts,
-      request: flow.request,
-      steps: flow.steps,
-      storedState,
-      wagmiConfig,
-    });
+    let writeParams: WriteContractParameters | null = null;
+    try {
+      setStepToGettingParams();
+      writeParams = await flowDeclaration.writeContractParams(currentStepId, {
+        account,
+        contracts,
+        request: flow.request,
+        steps: flow.steps,
+        storedState,
+        wagmiConfig,
+      });
+    } catch(error) {
+      setStepToError(error as Error);
+    }
+    
 
     if (writeParams) {
       contractWrite.writeContract(writeParams);
