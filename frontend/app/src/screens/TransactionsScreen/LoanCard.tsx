@@ -19,9 +19,6 @@ import { BOLD_TOKEN_SYMBOL, Button, HFlex, IconBorrow, IconLeverage, StatusDot, 
 import { a, useSpring } from "@react-spring/web";
 import * as dn from "dnum";
 import { match, P } from "ts-pattern";
-import { NrERC20 } from "@/src/abi/NrERC20";
-import { useReadContract } from "wagmi";
-import { getContracts } from "@/src/contracts";
 import { useStERC20Amount } from "@/src/services/Ethereum";
 
 const LOAN_CARD_HEIGHT = 246 - 16;

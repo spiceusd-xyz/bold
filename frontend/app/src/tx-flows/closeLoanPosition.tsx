@@ -14,9 +14,6 @@ import { ADDRESS_ZERO, BOLD_TOKEN_SYMBOL } from "@liquity2/uikit";
 import * as dn from "dnum";
 import * as v from "valibot";
 import { readContract } from "wagmi/actions";
-import { useReadContract } from "wagmi";
-import { NrERC20 } from "../abi/NrERC20";
-import { getContracts } from "../contracts";
 import { useStERC20Amount } from "../services/Ethereum";
 
 const FlowIdSchema = v.literal("closeLoanPosition");

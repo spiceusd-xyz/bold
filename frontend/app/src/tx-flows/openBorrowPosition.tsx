@@ -1,7 +1,7 @@
 import type { FlowDeclaration } from "@/src/services/TransactionFlow";
 
 import { Amount } from "@/src/comps/Amount/Amount";
-import { CONTRACT_USDB_TOKEN, ETH_GAS_COMPENSATION } from "@/src/constants";
+import { ETH_GAS_COMPENSATION } from "@/src/constants";
 import { dnum18 } from "@/src/dnum-utils";
 import { fmtnum } from "@/src/formatting";
 import { getCollToken, getPrefixedTroveId, usePredictOpenTroveUpfrontFee } from "@/src/liquity-utils";
@@ -16,7 +16,6 @@ import * as dn from "dnum";
 import * as v from "valibot";
 import { parseEventLogs } from "viem";
 import { readContract } from "wagmi/actions";
-import { Collateral } from "../contracts";
 import { getApprovalAddress, getApprovalAmount, getStERC20Amount, useStERC20Amount } from "../services/Ethereum";
 
 const FlowIdSchema = v.literal("openBorrowPosition");
