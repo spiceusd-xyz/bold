@@ -1,6 +1,6 @@
 "use client";
 
-import { InputField, lerp, norm, Slider } from "@liquity2/uikit";
+import { BOLD_TOKEN_SYMBOL, InputField, lerp, norm, Slider } from "@liquity2/uikit";
 import * as dn from "dnum";
 import { useFixtureInput } from "react-cosmos/client";
 
@@ -139,7 +139,7 @@ export default function InputFieldFixture() {
               >
                 {boldInterestPerYear}
               </span>{"   "}
-              BOLD / year
+              {BOLD_TOKEN_SYMBOL} / year
             </span>
           ),
           end: (
@@ -161,7 +161,7 @@ export default function InputFieldFixture() {
                 >
                   {boldRedeemableInFront}
                 </span>
-                <span>{" BOLD to redeem"}</span>
+                <span>{` ${BOLD_TOKEN_SYMBOL} to redeem`}</span>
               </span>
             </span>
           ),

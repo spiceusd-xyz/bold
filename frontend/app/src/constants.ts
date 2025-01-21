@@ -13,7 +13,7 @@ export const MAX_LTV_ALLOWED_RATIO = 0.916; // ratio of the max LTV allowed by t
 export const MAX_LTV_RESERVE_RATIO = 0.04; // ratio of the max LTV in non-limited mode (e.g. when updating a position), to prevent reaching the max LTV
 
 export const ETH_MAX_RESERVE = dn.from(0.1, 18); // leave 0.1 ETH when users click on "max" to deposit from their account
-export const ETH_GAS_COMPENSATION = dn.from(0.0375, 18); // see contracts/src/Dependencies/Constants.sol
+export const ETH_GAS_COMPENSATION = dn.from(0.0005, 18); // see contracts/src/Dependencies/Constants.sol
 
 export const MIN_ANNUAL_INTEREST_RATE = dn.from(0.005, 18); // 0.5%
 export const MAX_ANNUAL_INTEREST_RATE = dn.from(1, 18); // 100%
@@ -34,12 +34,15 @@ export const DATA_REFRESH_INTERVAL = 30_000;
 export const LEVERAGE_MAX_SLIPPAGE = 0.05; // 5%
 export const CLOSE_FROM_COLLATERAL_SLIPPAGE = 0.05; // 5%
 export const MAX_UPFRONT_FEE = 1000n * 10n ** 18n;
-export const MIN_DEBT = dn.from(2000, 18);
+export const MIN_DEBT = dn.from(100, 18);
 
 export const MAX_COLLATERAL_DEPOSITS: Record<CollateralSymbol, dn.Dnum> = {
   ETH: dn.from(100_000_000n, 18),
-  WSTETH: dn.from(100_000_000n, 18),
-  RETH: dn.from(100_000_000n, 18),
+  USDB: dn.from(100_000_000n, 18),
+  BLAST: dn.from(100_000_000n, 18),
+  FNX: dn.from(100_000_000n, 18),
+  HYPER: dn.from(100_000_000n, 18),
+  THRUST: dn.from(100_000_000n, 18),
 };
 
 // LTV factor suggestions, as ratios of the leverage factor range
@@ -67,3 +70,5 @@ export const REDEMPTION_RISK: Record<Exclude<RiskLevel, "high">, number> = {
   medium: 3.5 / 100,
   low: 5 / 100,
 };
+
+export const CONTRACT_USDB_TOKEN = '0x4300000000000000000000000000000000000003';

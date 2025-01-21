@@ -427,7 +427,7 @@ function subgraphTroveToLoan(
     borrower: trove.borrower,
     collIndex,
     createdAt: Number(trove.createdAt) * 1000,
-    deposit: dnum18(trove.deposit),
+    deposit: [BigInt(trove.deposit), (collIndex === 0 || collIndex === 1) ? 9 : 18],
     interestRate: dnum18(trove.interestBatch?.annualInterestRate ?? trove.interestRate),
     troveId: trove.troveId,
     updatedAt: Number(trove.updatedAt) * 1000,

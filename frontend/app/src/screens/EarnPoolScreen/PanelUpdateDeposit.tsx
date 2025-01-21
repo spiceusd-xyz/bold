@@ -14,7 +14,7 @@ import { useAccount, useBalance } from "@/src/services/Ethereum";
 import { useTransactionFlow } from "@/src/services/TransactionFlow";
 import { infoTooltipProps } from "@/src/uikit-utils";
 import { css } from "@/styled-system/css";
-import { Button, Checkbox, HFlex, InfoTooltip, InputField, Tabs, TextButton, TokenIcon } from "@liquity2/uikit";
+import { BOLD_TOKEN_SYMBOL, Button, Checkbox, HFlex, InfoTooltip, InputField, Tabs, TextButton, TokenIcon } from "@liquity2/uikit";
 import * as dn from "dnum";
 import { useState } from "react";
 
@@ -50,7 +50,7 @@ export function PanelUpdateDeposit({
     DNUM_0,
   );
 
-  const boldBalance = useBalance(account.address, "BOLD");
+  const boldBalance = useBalance(account.address, BOLD_TOKEN_SYMBOL);
 
   const updatedBoldQty = dn.add(deposited, depositDifference);
 
@@ -80,8 +80,8 @@ export function PanelUpdateDeposit({
             contextual={
               <InputTokenBadge
                 background={false}
-                icon={<TokenIcon symbol="BOLD" />}
-                label="BOLD"
+                icon={<TokenIcon symbol={BOLD_TOKEN_SYMBOL} />}
+                label={BOLD_TOKEN_SYMBOL}
               />
             }
             id="input-deposit-change"
@@ -131,13 +131,13 @@ export function PanelUpdateDeposit({
               end: mode === "add"
                 ? boldBalance.data && (
                   <TextButton
-                    label={`Max ${fmtnum(boldBalance.data, 2)} BOLD`}
+                    label={`Max ${fmtnum(boldBalance.data, 2)} ${BOLD_TOKEN_SYMBOL}`}
                     onClick={() => setValue(dn.toString(boldBalance.data))}
                   />
                 )
                 : position?.deposit && dn.gt(position.deposit, 0) && (
                   <TextButton
-                    label={`Max ${fmtnum(position.deposit, 2)} BOLD`}
+                    label={`Max ${fmtnum(position.deposit, 2)} ${BOLD_TOKEN_SYMBOL}`}
                     onClick={() => {
                       setValue(dn.toString(position.deposit));
                       setClaimRewards(true);

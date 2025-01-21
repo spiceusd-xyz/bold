@@ -7,6 +7,7 @@ import { usePrice } from "@/src/services/Prices";
 import { vCollIndex, vPositionEarn } from "@/src/valibot-utils";
 import * as dn from "dnum";
 import * as v from "valibot";
+import { BOLD_TOKEN_SYMBOL } from "@liquity2/uikit";
 
 const FlowIdSchema = v.literal("earnDeposit");
 
@@ -58,7 +59,7 @@ export const earnDeposit: FlowDeclaration<Request, Step> = {
 
   Details({ flow }) {
     const { request } = flow;
-    const boldPrice = usePrice("BOLD");
+    const boldPrice = usePrice(BOLD_TOKEN_SYMBOL);
     const boldAmount = dn.sub(
       request.earnPosition.deposit,
       request.prevEarnPosition?.deposit ?? dn.from(0, 18),
@@ -70,7 +71,7 @@ export const earnDeposit: FlowDeclaration<Request, Step> = {
           value={[
             <Amount
               key="start"
-              suffix=" BOLD"
+              suffix={` ${BOLD_TOKEN_SYMBOL}`}
               value={boldAmount}
             />,
             <Amount

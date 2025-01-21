@@ -8,11 +8,12 @@ import { getCollToken, shortenTroveId } from "@/src/liquity-utils";
 import { usePrice } from "@/src/services/Prices";
 import { riskLevelToStatusMode } from "@/src/uikit-utils";
 import { css } from "@/styled-system/css";
-import { HFlex, IconBorrow, StatusDot, TokenIcon } from "@liquity2/uikit";
+import { BOLD_TOKEN_SYMBOL, HFlex, IconBorrow, StatusDot, TokenIcon } from "@liquity2/uikit";
 import * as dn from "dnum";
 import Link from "next/link";
 import { PositionCard } from "./PositionCard";
 import { CardRow, CardRows } from "./shared";
+import { useStERC20Amount } from "@/src/services/Ethereum";
 
 export function PositionCardBorrow({
   batchManager,
@@ -45,11 +46,13 @@ export function PositionCardBorrow({
   const maxLtv = token && dn.from(1 / token.collateralRatio, 18);
   const liquidationRisk = ltv && maxLtv && getLiquidationRisk(ltv, maxLtv);
 
+  const displayedCollAmount = useStERC20Amount(token?.symbol, deposit);
+  
   const title = token
     ? [
       `Loan ID: ${shortenTroveId(troveId)}…`,
-      `Borrowed: ${fmtnum(borrowed, "full")} BOLD`,
-      `Collateral: ${fmtnum(deposit, "full")} ${token.name}`,
+      `Borrowed: ${fmtnum(borrowed, "full")} ${BOLD_TOKEN_SYMBOL}`,
+      `Collateral: ${fmtnum(displayedCollAmount, "full")} ${token.name}`,
       `Interest rate: ${fmtnum(interestRate, "full", 100)}%`,
     ]
     : [];
@@ -71,7 +74,7 @@ export function PositionCardBorrow({
               color: "positionContent",
             })}
           >
-            <div>BOLD loan</div>
+            <div>{BOLD_TOKEN_SYMBOL} loan</div>
             {statusTag}
           </div>
         }
@@ -90,7 +93,7 @@ export function PositionCardBorrow({
               {fmtnum(borrowed)}
               <TokenIcon
                 size={24}
-                symbol="BOLD"
+                symbol={BOLD_TOKEN_SYMBOL}
               />
             </HFlex>
           ),
@@ -103,7 +106,7 @@ export function PositionCardBorrow({
                 alignItems: "cente",
               })}
             >
-              Backed by {deposit ? dn.format(deposit, 2) : "−"} {token.name}
+              Backed by {displayedCollAmount ? dn.format(displayedCollAmount, 2) : "−"} {token.name}
               <TokenIcon size="small" symbol={token.symbol} />
             </div>
           ),

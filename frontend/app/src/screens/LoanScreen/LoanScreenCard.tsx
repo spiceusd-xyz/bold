@@ -16,6 +16,7 @@ import { riskLevelToStatusMode } from "@/src/uikit-utils";
 import { roundToDecimal } from "@/src/utils";
 import { css } from "@/styled-system/css";
 import {
+  BOLD_TOKEN_SYMBOL,
   Button,
   Dropdown,
   HFlex,
@@ -36,6 +37,7 @@ import * as dn from "dnum";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { match, P } from "ts-pattern";
+import { useStERC20Amount } from "@/src/services/Ethereum";
 
 type LoanMode = "borrow" | "leverage";
 
@@ -84,7 +86,7 @@ export function LoanScreenCard({
   );
 
   const nftUrl = useTroveNftUrl(loan?.collIndex ?? null, troveId);
-  const title = mode === "leverage" ? "Leverage loan" : "BOLD loan";
+  const title = mode === "leverage" ? "Leverage loan" : `${BOLD_TOKEN_SYMBOL} loan`;
 
   return (
     <ScreenCard
@@ -344,6 +346,7 @@ function LoanCard({
   nftUrl: string | null;
   onLeverageModeChange: (mode: LoanMode) => void;
 }) {
+  const loanDeposit = useStERC20Amount(props.collateral.symbol, props.loan.deposit);
   const [notifyCopy, setNotifyCopy] = useState(false);
 
   useEffect(() => {
@@ -427,7 +430,7 @@ function LoanCard({
         troveId,
         nftUrl,
       }) => {
-        const title = mode === "leverage" ? "Leverage loan" : "BOLD loan";
+        const title = mode === "leverage" ? "Leverage loan" : `${BOLD_TOKEN_SYMBOL} loan`;
         return (
           <a.div
             className={css({
@@ -526,22 +529,22 @@ function LoanCard({
                       </div>
                     }
                     items={[
-                      {
-                        icon: (
-                          <div
-                            className={css({
-                              color: "accent",
-                            })}
-                          >
-                            {mode === "leverage"
-                              ? <IconBorrow size={16} />
-                              : <IconLeverage size={16} />}
-                          </div>
-                        ),
-                        label: mode === "leverage"
-                          ? "Convert to BOLD loan"
-                          : "Convert to leverage loan",
-                      },
+                      // {
+                      //   icon: (
+                      //     <div
+                      //       className={css({
+                      //         color: "accent",
+                      //       })}
+                      //     >
+                      //       {mode === "leverage"
+                      //         ? <IconBorrow size={16} />
+                      //         : <IconLeverage size={16} />}
+                      //     </div>
+                      //   ),
+                      //   label: mode === "leverage"
+                      //     ? `Convert to ${BOLD_TOKEN_SYMBOL} loan`
+                      //     : "Convert to leverage loan",
+                      // },
                       {
                         icon: (
                           <div
@@ -638,14 +641,14 @@ function LoanCard({
                   {mode === "leverage"
                     ? (
                       <div
-                        title={`${fmtnum(loan.deposit, "full")} ${collateral}`}
+                        title={`${fmtnum(loanDeposit, "full")} ${collateral}`}
                         className={css({
                           display: "flex",
                           alignItems: "center",
                           gap: 12,
                         })}
                       >
-                        <div>{fmtnum(loan.deposit)}</div>
+                        <div>{fmtnum(loanDeposit)}</div>
                         <TokenIcon symbol={collateral.symbol} size={32} />
                         <div
                           className={css({
@@ -676,7 +679,7 @@ function LoanCard({
                     )
                     : (
                       <div
-                        title={`${fmtnum(loan.borrowed)} BOLD`}
+                        title={`${fmtnum(loan.borrowed)} ${BOLD_TOKEN_SYMBOL}`}
                         className={css({
                           display: "flex",
                           alignItems: "center",
@@ -684,7 +687,7 @@ function LoanCard({
                         })}
                       >
                         {fmtnum(loan.borrowed)}
-                        <TokenIcon symbol="BOLD" size={32} />
+                        <TokenIcon symbol={BOLD_TOKEN_SYMBOL} size={32} />
                       </div>
                     )}
                 </div>
@@ -739,8 +742,8 @@ function LoanCard({
                       )
                       : (
                         <GridItem label="Collateral">
-                          <div title={`${fmtnum(loan.deposit, "full")} ${collateral.name}`}>
-                            {fmtnum(loan.deposit)} {collateral.name}
+                          <div title={`${fmtnum(loanDeposit, "full")} ${collateral.name}`}>
+                            {fmtnum(loanDeposit)} {collateral.name}
                           </div>
                         </GridItem>
                       )}

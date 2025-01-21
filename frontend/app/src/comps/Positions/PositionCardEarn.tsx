@@ -3,7 +3,7 @@ import type { PositionEarn } from "@/src/types";
 import { Amount } from "@/src/comps/Amount/Amount";
 import { getCollToken, useEarnPool, useEarnPosition } from "@/src/liquity-utils";
 import { css } from "@/styled-system/css";
-import { HFlex, IconEarn, TokenIcon } from "@liquity2/uikit";
+import { BOLD_TOKEN_SYMBOL, HFlex, IconEarn, TokenIcon } from "@liquity2/uikit";
 import Link from "next/link";
 import { PositionCard } from "./PositionCard";
 import { CardRow, CardRows } from "./shared";
@@ -55,7 +55,7 @@ export function PositionCardEarn({
           value: (
             <HFlex gap={8} alignItems="center" justifyContent="flex-start">
               <Amount value={deposit} format={2} />
-              <TokenIcon size="medium" symbol="BOLD" />
+              <TokenIcon size="medium" symbol={BOLD_TOKEN_SYMBOL} />
             </HFlex>
           ),
           label: token && (
@@ -126,7 +126,7 @@ export function PositionCardEarn({
                       value={earnPosition.data?.rewards.bold}
                       format={2}
                     />
-                    <TokenIcon size="mini" symbol="BOLD" />
+                    <TokenIcon size="mini" symbol={BOLD_TOKEN_SYMBOL} />
                   </div>
                   <div
                     className={css({

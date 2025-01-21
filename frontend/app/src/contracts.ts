@@ -92,11 +92,13 @@ type CollateralContracts = {
   [K in CollateralContractName]: Contract<K>;
 };
 
-type Collaterals = Array<{
+export type Collateral = {
   collIndex: CollIndex;
   contracts: CollateralContracts;
   symbol: CollateralSymbol;
-}>;
+}
+
+type Collaterals = Array<Collateral>;
 
 export type Contracts = ProtocolContractMap & {
   collaterals: Collaterals;
@@ -115,7 +117,7 @@ const CONTRACTS: Contracts = {
 
   collaterals: COLLATERAL_CONTRACTS.map(({ collIndex, symbol, contracts }) => ({
     collIndex,
-    symbol,
+    symbol: symbol as CollateralSymbol,
     contracts: {
       ActivePool: { address: contracts.ACTIVE_POOL, abi: abis.ActivePool },
       BorrowerOperations: { address: contracts.BORROWER_OPERATIONS, abi: abis.BorrowerOperations },

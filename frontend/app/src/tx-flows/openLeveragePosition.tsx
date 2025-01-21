@@ -14,7 +14,7 @@ import { graphQuery, TroveByIdQuery } from "@/src/subgraph-queries";
 import { isTroveId } from "@/src/types";
 import { noop } from "@/src/utils";
 import { vPositionLoanUncommited } from "@/src/valibot-utils";
-import { ADDRESS_ZERO } from "@liquity2/uikit";
+import { ADDRESS_ZERO, BOLD_TOKEN_SYMBOL } from "@liquity2/uikit";
 import * as dn from "dnum";
 import * as v from "valibot";
 import { parseEventLogs } from "viem";
@@ -103,13 +103,13 @@ export const openLeveragePosition: FlowDeclaration<Request, Step> = {
         <TransactionDetailsRow
           label="Borrowed"
           value={[
-            `${fmtnum(borrowedWithFee)} BOLD`,
+            `${fmtnum(borrowedWithFee)} ${BOLD_TOKEN_SYMBOL}`,
             <Amount
               key="end"
               fallback="…"
               prefix="Incl. "
               value={upfrontFee.data}
-              suffix=" BOLD interest rate adjustment fee"
+              suffix={` ${BOLD_TOKEN_SYMBOL} interest rate adjustment fee`}
             />,
           ]}
         />
@@ -120,7 +120,7 @@ export const openLeveragePosition: FlowDeclaration<Request, Step> = {
               value={[
                 <AccountButton key="start" address={loan.batchManager} />,
                 <div key="end">
-                  {fmtnum(loan.interestRate, "full", 100)}% (~{fmtnum(yearlyBoldInterest, 4)} BOLD per year)
+                  {fmtnum(loan.interestRate, "full", 100)}% (~{fmtnum(yearlyBoldInterest, 4)} {BOLD_TOKEN_SYMBOL} per year)
                 </div>,
               ]}
             />
@@ -130,7 +130,7 @@ export const openLeveragePosition: FlowDeclaration<Request, Step> = {
               label="Interest rate"
               value={[
                 `${fmtnum(loan.interestRate, 2, 100)}%`,
-                `${fmtnum(dn.mul(loan.borrowed, loan.interestRate))} BOLD per year`,
+                `${fmtnum(dn.mul(loan.borrowed, loan.interestRate))} ${BOLD_TOKEN_SYMBOL} per year`,
               ]}
             />
           )}

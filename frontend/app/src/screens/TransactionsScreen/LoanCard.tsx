@@ -15,10 +15,11 @@ import { riskLevelToStatusMode } from "@/src/uikit-utils";
 import { roundToDecimal } from "@/src/utils";
 import { css } from "@/styled-system/css";
 import { token } from "@/styled-system/tokens";
-import { Button, HFlex, IconBorrow, IconLeverage, StatusDot, TokenIcon } from "@liquity2/uikit";
+import { BOLD_TOKEN_SYMBOL, Button, HFlex, IconBorrow, IconLeverage, StatusDot, TokenIcon } from "@liquity2/uikit";
 import { a, useSpring } from "@react-spring/web";
 import * as dn from "dnum";
 import { match, P } from "ts-pattern";
+import { useStERC20Amount } from "@/src/services/Ethereum";
 
 const LOAN_CARD_HEIGHT = 246 - 16;
 const LOAN_CARD_HEIGHT_REDUCED = 176;
@@ -40,13 +41,16 @@ export function LoanCard({
 }) {
   const collToken = getCollToken(loan?.collIndex ?? prevLoan?.collIndex ?? null);
 
-  if (!collToken) {
+  if (!collToken || !loan) {
     return null;
   }
 
   const collPriceUsd = usePrice(collToken.symbol);
 
   const isLoanClosing = prevLoan && !loan;
+
+  const loanDeposit = useStERC20Amount(collToken.symbol, loan.deposit);
+  const prevLoanDeposit = useStERC20Amount(collToken.symbol, prevLoan?.deposit);
 
   const loanDetails = loan && getLoanDetails(
     loan.deposit,
@@ -119,13 +123,13 @@ export function LoanCard({
                   </div>
                   {prevLoan && (
                     <div
-                      title={`${fmtnum(prevLoan.deposit, "full")} ${collToken.name}`}
+                      title={`${fmtnum(prevLoanDeposit, "full")} ${collToken.name}`}
                       className={css({
                         color: "contentAlt",
                         textDecoration: "line-through",
                       })}
                     >
-                      {fmtnum(prevLoan.deposit)} {collToken.name}
+                      {fmtnum(prevLoanDeposit)} {collToken.name}
                     </div>
                   )}
                 </div>
@@ -204,18 +208,18 @@ export function LoanCard({
                           gap: 8,
                         })}
                       >
-                        <div title={`${fmtnum(loan.deposit, "full")} ${collToken.name}`}>
-                          {fmtnum(loan.deposit)} {collToken.name}
+                        <div title={`${fmtnum(loanDeposit, "full")} ${collToken.name}`}>
+                          {fmtnum(loanDeposit)} {collToken.name}
                         </div>
-                        {prevLoan && !dn.eq(prevLoan.deposit, loan.deposit) && (
+                        {prevLoanDeposit && loanDeposit && !dn.eq(prevLoanDeposit, loanDeposit) && (
                           <div
-                            title={`${fmtnum(prevLoan.deposit, "full")} ${collToken.name}`}
+                            title={`${fmtnum(prevLoanDeposit, "full")} ${collToken.name}`}
                             className={css({
                               color: "contentAlt",
                               textDecoration: "line-through",
                             })}
                           >
-                            {fmtnum(prevLoan.deposit)} {collToken.name}
+                            {fmtnum(prevLoanDeposit)} {collToken.name}
                           </div>
                         )}
                       </div>
@@ -417,7 +421,7 @@ function TotalDebt({
         })}
       >
         <div
-          title={`${fmtnum(loan.borrowed, "full")} BOLD`}
+          title={`${fmtnum(loan.borrowed, "full")} ${BOLD_TOKEN_SYMBOL}`}
           className={css({
             display: "flex",
             alignItems: "center",
@@ -431,10 +435,10 @@ function TotalDebt({
           >
             {fmtnum(loan.borrowed)}
           </div>
-          <TokenIcon symbol="BOLD" size={32} />
+          <TokenIcon symbol={BOLD_TOKEN_SYMBOL} size={32} />
           {prevLoan && !dn.eq(prevLoan.borrowed, loan.borrowed) && (
             <div
-              title={`${fmtnum(prevLoan.borrowed, "full")} BOLD`}
+              title={`${fmtnum(prevLoan.borrowed, "full")} ${BOLD_TOKEN_SYMBOL}`}
               className={css({
                 color: "contentAlt",
                 textDecoration: "line-through",
@@ -546,7 +550,7 @@ function LoadingCard({
   onRetry: () => void;
   txPreviewMode?: boolean;
 }) {
-  const title = leverage ? "Leverage loan" : "BOLD loan";
+  const title = leverage ? "Leverage loan" : `${BOLD_TOKEN_SYMBOL} loan`;
 
   const spring = useSpring({
     to: match(loadingState)

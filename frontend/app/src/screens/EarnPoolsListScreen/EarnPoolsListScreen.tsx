@@ -1,6 +1,6 @@
 "use client";
 
-import type { CollIndex } from "@/src/types";
+import type { CollIndex, TokenSymbol } from "@/src/types";
 
 import { EarnPositionSummary } from "@/src/comps/EarnPositionSummary/EarnPositionSummary";
 import { Screen } from "@/src/comps/Screen/Screen";
@@ -9,7 +9,7 @@ import { getContracts } from "@/src/contracts";
 import { useEarnPosition } from "@/src/liquity-utils";
 import { useAccount } from "@/src/services/Ethereum";
 import { css } from "@/styled-system/css";
-import { TokenIcon } from "@liquity2/uikit";
+import { BOLD_TOKEN_SYMBOL, TokenIcon } from "@liquity2/uikit";
 import { a, useTransition } from "@react-spring/web";
 
 export function EarnPoolsListScreen() {
@@ -41,14 +41,14 @@ export function EarnPoolsListScreen() {
           >
             {content.earnHome.headline(
               <TokenIcon.Group>
-                {["BOLD" as const, ...collaterals.map((coll) => coll.symbol)].map((symbol) => (
+                {[BOLD_TOKEN_SYMBOL, ...collaterals.map((coll) => coll.symbol)].map((symbol) => (
                   <TokenIcon
                     key={symbol}
-                    symbol={symbol}
+                    symbol={symbol as TokenSymbol}
                   />
                 ))}
               </TokenIcon.Group>,
-              <TokenIcon symbol="BOLD" />,
+              <TokenIcon symbol={BOLD_TOKEN_SYMBOL} />,
             )}
           </div>
         ),

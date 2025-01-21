@@ -23,7 +23,7 @@ import { dnum18, dnumMax } from "@/src/dnum-utils";
 import { useInputFieldValue } from "@/src/form-utils";
 import { fmtnum } from "@/src/formatting";
 import { getLiquidationRisk, getLoanDetails, getLtv } from "@/src/liquity-math";
-import { useAccount, useBalance } from "@/src/services/Ethereum";
+import { useAccount, useBalance, useNrERC20Amount } from "@/src/services/Ethereum";
 import { usePrice } from "@/src/services/Prices";
 import { useTransactionFlow } from "@/src/services/TransactionFlow";
 import { useTrovesCount } from "@/src/subgraph-hooks";
@@ -42,6 +42,7 @@ import {
   PillButton,
   TextButton,
   TokenIcon,
+  BOLD_TOKEN_SYMBOL,
 } from "@liquity2/uikit";
 import * as dn from "dnum";
 import { useParams, useRouter } from "next/navigation";
@@ -91,6 +92,8 @@ export function BorrowScreen() {
     },
   });
 
+  const normalizedDeposit = useNrERC20Amount(collateral.symbol, deposit.parsed) ?? null;
+
   const debt = useInputFieldValue(fmtnum);
 
   const [interestRate, setInterestRate] = useState(dn.div(dn.from(INTEREST_RATE_DEFAULT, 18), 100));
@@ -102,6 +105,7 @@ export function BorrowScreen() {
   const balances = Object.fromEntries(KNOWN_COLLATERAL_SYMBOLS.map((symbol) => ([
     symbol,
     // known collaterals are static so we can safely call this hook in a .map()
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     useBalance(account.address, symbol),
   ] as const)));
 
@@ -110,7 +114,7 @@ export function BorrowScreen() {
   const troveCount = useTrovesCount(account.address ?? null, collIndex);
 
   const loanDetails = getLoanDetails(
-    deposit.isEmpty ? null : deposit.parsed,
+    deposit.isEmpty ? null : normalizedDeposit,
     debt.isEmpty ? null : debt.parsed,
     interestRate,
     collateral.collateralRatio,
@@ -160,8 +164,8 @@ export function BorrowScreen() {
   const isBelowMinDebt = debt.parsed && !debt.isEmpty && dn.lt(debt.parsed, MIN_DEBT);
 
   const allowSubmit = account.isConnected
-    && deposit.parsed
-    && dn.gt(deposit.parsed, 0)
+    && normalizedDeposit
+    && dn.gt(normalizedDeposit, 0)
     && debt.parsed
     && dn.gt(debt.parsed, 0)
     && interestRate
@@ -181,7 +185,7 @@ export function BorrowScreen() {
                   />
                 ))}
               </TokenIcon.Group>,
-              <TokenIcon symbol="BOLD" />,
+              <TokenIcon symbol={BOLD_TOKEN_SYMBOL} />,
             )}
           </HFlex>
         ),
@@ -263,13 +267,13 @@ export function BorrowScreen() {
               id="input-debt"
               contextual={
                 <InputField.Badge
-                  icon={<TokenIcon symbol="BOLD" />}
-                  label="BOLD"
+                  icon={<TokenIcon symbol={BOLD_TOKEN_SYMBOL} />}
+                  label={BOLD_TOKEN_SYMBOL}
                 />
               }
               drawer={debt.isFocused || !isBelowMinDebt ? null : {
                 mode: "error",
-                message: `You must borrow at least ${fmtnum(MIN_DEBT, 2)} BOLD.`,
+                message: `You must borrow at least ${fmtnum(MIN_DEBT, 2)} ${BOLD_TOKEN_SYMBOL}.`,
               }}
               label="Loan"
               placeholder="0.00"
@@ -385,7 +389,7 @@ export function BorrowScreen() {
             size="large"
             wide
             onClick={() => {
-              if (deposit.parsed && debt.parsed && account.address) {
+              if (normalizedDeposit && debt.parsed && account.address) {
                 txFlow.start({
                   flowId: "openBorrowPosition",
                   backLink: ["/borrow", "Back to editing"],
@@ -395,7 +399,7 @@ export function BorrowScreen() {
                   collIndex,
                   owner: account.address,
                   ownerIndex: troveCount.data ?? 0,
-                  collAmount: deposit.parsed,
+                  collAmount: normalizedDeposit,
                   boldAmount: debt.parsed,
                   upperHint: dnum18(0),
                   lowerHint: dnum18(0),

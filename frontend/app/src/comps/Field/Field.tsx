@@ -319,7 +319,7 @@ export const FooterInfoCollPrice = memo(
             >
               ${fmtnum(collPriceUsd)}
             </span>
-            <InfoTooltip {...infoTooltipProps(content.generalInfotooltips.ethPrice)} />
+            <InfoTooltip {...infoTooltipProps(content.generalInfotooltips.ethPrice(collName))} />
           </HFlex>
         }
       />

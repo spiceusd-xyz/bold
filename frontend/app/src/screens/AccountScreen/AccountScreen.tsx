@@ -12,6 +12,7 @@ import { useAccount, useBalance } from "@/src/services/Ethereum";
 import { css } from "@/styled-system/css";
 import {
   addressesEqual,
+  BOLD_TOKEN_SYMBOL,
   Button,
   IconAccount,
   isCollateralSymbol,
@@ -103,10 +104,10 @@ export function AccountScreen({
               gridTemplateColumns: `repeat(3, 1fr)`,
             }}
           >
-            <GridItem label="BOLD balance">
+            <GridItem label={`${BOLD_TOKEN_SYMBOL} balance`}>
               <Balance
                 address={address}
-                tokenSymbol="BOLD"
+                tokenSymbol={BOLD_TOKEN_SYMBOL}
               />
             </GridItem>
             <GridItem label="LQTY balance">
@@ -185,6 +186,7 @@ function Balance({
           size="mini"
           label="tap"
           onClick={() => {
+            // @ts-ignore
             if ((tokenSymbol === "WSTETH" || tokenSymbol === "RETH") && CollToken) {
               writeContract({
                 abi: ERC20Faucet,

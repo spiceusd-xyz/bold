@@ -1,6 +1,6 @@
 "use client";
 
-import { IconInfo, TextButton, Tooltip } from "@liquity2/uikit";
+import { BOLD_TOKEN_SYMBOL, IconInfo, TextButton, Tooltip } from "@liquity2/uikit";
 
 export default function TooltipFixture() {
   return (
@@ -20,7 +20,7 @@ export default function TooltipFixture() {
           gap: 8,
         }}
       >
-        <h1>55M BOLD to redeem before you</h1>
+        <h1>55M {BOLD_TOKEN_SYMBOL} to redeem before you</h1>
         <p
           style={{
             fontSize: 14,

@@ -14,12 +14,13 @@ import { useInputFieldValue } from "@/src/form-utils";
 import { fmtnum, formatRisk } from "@/src/formatting";
 import { getLoanDetails } from "@/src/liquity-math";
 import { getCollToken } from "@/src/liquity-utils";
-import { useAccount, useBalance } from "@/src/services/Ethereum";
+import { useAccount, useBalance, useNrERC20Amount, useStERC20Amount } from "@/src/services/Ethereum";
 import { usePrice } from "@/src/services/Prices";
 import { useTransactionFlow } from "@/src/services/TransactionFlow";
 import { riskLevelToStatusMode } from "@/src/uikit-utils";
 import { css } from "@/styled-system/css";
 import {
+  BOLD_TOKEN_SYMBOL,
   Button,
   HFlex,
   InfoTooltip,
@@ -52,17 +53,19 @@ export function PanelUpdateBorrowPosition({
   }
 
   const collPrice = usePrice(collToken.symbol ?? null);
-  const boldPriceUsd = usePrice("BOLD") ?? dnum18(0);
+  const boldPriceUsd = usePrice(BOLD_TOKEN_SYMBOL) ?? dnum18(0);
 
   // deposit change
   const [depositMode, setDepositMode] = useState<ValueUpdateMode>("add");
   const depositChange = useInputFieldValue((value) => dn.format(value));
 
+  const normalizedDepositChange = useNrERC20Amount(collToken.symbol, depositChange.parsed) ?? null;
+
   // deposit update
-  const newDeposit = depositChange.parsed && (
+  const newDeposit = normalizedDepositChange && (
     depositMode === "remove"
-      ? dn.sub(loan.deposit, depositChange.parsed)
-      : dn.add(loan.deposit, depositChange.parsed)
+      ? dn.sub(loan.deposit, normalizedDepositChange)
+      : dn.add(loan.deposit, normalizedDepositChange)
   );
 
   // debt change
@@ -77,7 +80,7 @@ export function PanelUpdateBorrowPosition({
   );
 
   const collBalance = useBalance(account.address, collToken.symbol);
-  const boldBalance = useBalance(account.address, "BOLD");
+  const boldBalance = useBalance(account.address, BOLD_TOKEN_SYMBOL);
 
   const collMax = depositMode === "remove" ? null : (
     collBalance.data && dnumMax(
@@ -95,6 +98,9 @@ export function PanelUpdateBorrowPosition({
       loan.borrowed,
     )
     : null;
+
+  const loanDeposit = useStERC20Amount(collToken.symbol, loan?.deposit);
+  const newLoanDeposit = useStERC20Amount(collToken.symbol, newDeposit);
 
   if (!collPrice) {
     return null;
@@ -188,13 +194,13 @@ export function PanelUpdateBorrowPosition({
             />
           }
           footer={{
-            end: loanDetails.deposit && newLoanDetails.deposit && (
+            end: loanDeposit && newLoanDeposit && (
               <Field.FooterInfo
                 label={
                   <HFlex alignItems="center" gap={8}>
                     <Amount
                       format={2}
-                      value={loanDetails.deposit}
+                      value={loanDeposit}
                     />
                     <div>{ARROW_RIGHT}</div>
                   </HFlex>
@@ -204,7 +210,7 @@ export function PanelUpdateBorrowPosition({
                     <Amount
                       format={2}
                       suffix={` ${collToken.name}`}
-                      value={newLoanDetails.deposit}
+                      value={newLoanDeposit}
                     />
                     <InfoTooltip heading="Collateral update">
                       <div>
@@ -212,7 +218,7 @@ export function PanelUpdateBorrowPosition({
                         <Amount
                           format={2}
                           suffix={` ${collToken.name}`}
-                          value={loanDetails.deposit}
+                          value={loanDeposit}
                         />
                         {collPrice && (
                           <>
@@ -220,7 +226,7 @@ export function PanelUpdateBorrowPosition({
                             <Amount
                               format={2}
                               prefix="$"
-                              value={dn.mul(loanDetails.deposit, collPrice)}
+                              value={dn.mul(loanDeposit, collPrice)}
                             />
                             {")"}
                           </>
@@ -231,7 +237,7 @@ export function PanelUpdateBorrowPosition({
                         <Amount
                           format={2}
                           suffix={` ${collToken.name}`}
-                          value={newLoanDetails.deposit}
+                          value={newLoanDeposit}
                         />
                         {collPrice && (
                           <>
@@ -239,7 +245,7 @@ export function PanelUpdateBorrowPosition({
                             <Amount
                               format={2}
                               prefix="$"
-                              value={dn.mul(newLoanDetails.deposit, collPrice)}
+                              value={dn.mul(newLoanDeposit, collPrice)}
                             />
                             {")"}
                           </>
@@ -261,12 +267,12 @@ export function PanelUpdateBorrowPosition({
               contextual={
                 <InputTokenBadge
                   background={false}
-                  icon={<TokenIcon symbol="BOLD" />}
-                  label="BOLD"
+                  icon={<TokenIcon symbol={BOLD_TOKEN_SYMBOL} />}
+                  label={BOLD_TOKEN_SYMBOL}
                 />
               }
               drawer={!debtChange.isFocused && isBelowMinDebt
-                ? { mode: "error", message: `You must borrow at least ${fmtnum(MIN_DEBT, 2)} BOLD.` }
+                ? { mode: "error", message: `You must borrow at least ${fmtnum(MIN_DEBT, 2)} ${BOLD_TOKEN_SYMBOL}.` }
                 : null}
               label={{
                 start: debtMode === "remove"
@@ -298,7 +304,7 @@ export function PanelUpdateBorrowPosition({
                 end: (
                   boldMax && (
                     <TextButton
-                      label={`Max ${fmtnum(boldMax)} BOLD`}
+                      label={`Max ${fmtnum(boldMax)} ${BOLD_TOKEN_SYMBOL}`}
                       onClick={() => {
                         debtChange.setValue(dn.toString(boldMax));
                       }}
@@ -329,15 +335,15 @@ export function PanelUpdateBorrowPosition({
                     >
                       <Amount
                         value={newLoanDetails.debt}
-                        suffix=" BOLD"
+                        suffix={` ${BOLD_TOKEN_SYMBOL}`}
                       />
                     </div>
                     <InfoTooltip heading="Debt update">
                       <div>
-                        Before: <Amount value={loanDetails.debt} suffix=" BOLD" />
+                        Before: <Amount value={loanDetails.debt} suffix={` ${BOLD_TOKEN_SYMBOL}`} />
                       </div>
                       <div>
-                        After: <Amount value={newLoanDetails.debt} suffix=" BOLD" />
+                        After: <Amount value={newLoanDetails.debt} suffix={` ${BOLD_TOKEN_SYMBOL}`} />
                       </div>
                     </InfoTooltip>
                   </HFlex>

@@ -17,6 +17,7 @@ import { css } from "@/styled-system/css";
 import {
   AddressField,
   AnchorTextButton,
+  BOLD_TOKEN_SYMBOL,
   Button,
   Dropdown,
   HFlex,
@@ -222,7 +223,7 @@ export const InterestRateField = memo(
                 <div>
                   {boldInterestPerYear && (mode === "manual" || delegate !== null)
                     ? fmtnum(boldInterestPerYear, 2)
-                    : "−"} BOLD / year
+                    : "−"} {BOLD_TOKEN_SYMBOL} / year
                 </div>
                 <InfoTooltip {...infoTooltipProps(content.generalInfotooltips.interestRateBoldPerYear)} />
               </HFlex>
@@ -239,7 +240,7 @@ export const InterestRateField = memo(
                     ? fmtnum(boldRedeemableInFront, "compact")
                     : "−"}
                 </span>
-                <span>{" BOLD"}</span>
+                <span>{` ${BOLD_TOKEN_SYMBOL}`}</span>
               </span>
             ),
           }}
@@ -713,8 +714,8 @@ function DelegateBox({
             })}
           >
             <div>Redemptions</div>
-            <div title={`${fmtnum(delegate.redemptions, "full")} BOLD`}>
-              {fmtnum(delegate.redemptions, "compact")} BOLD
+            <div title={`${fmtnum(delegate.redemptions, "full")} ${BOLD_TOKEN_SYMBOL}`}>
+              {fmtnum(delegate.redemptions, "compact")} {BOLD_TOKEN_SYMBOL}
             </div>
           </div>
           <div
