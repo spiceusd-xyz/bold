@@ -15,7 +15,7 @@ import { match, P } from "ts-pattern";
 import * as v from "valibot";
 import { readContract } from "wagmi/actions";
 import { BOLD_TOKEN_SYMBOL } from "@liquity2/uikit";
-import { NrERC20 } from "../abi/NrERC20";
+import { getApprovalAddress, getApprovalAmount, getStERC20Amount, useStERC20Amount } from "../services/Ethereum";
 
 const FlowIdSchema = v.literal("updateBorrowPosition");
 
@@ -142,6 +142,8 @@ export const updateBorrowPosition: FlowDeclaration<Request, Step> = {
 
     const collChange = getCollChange(loan, prevLoan);
 
+    const displayedCollChange = useStERC20Amount(loan.collIndex, collChange);
+
     const collateral = getCollToken(loan.collIndex);
     if (!collateral) {
       throw new Error(`Invalid collateral index: ${loan.collIndex}`);
@@ -155,26 +157,26 @@ export const updateBorrowPosition: FlowDeclaration<Request, Step> = {
 
     return (
       <>
-        {!dn.eq(collChange, 0) && (
+        {displayedCollChange && !dn.eq(displayedCollChange, 0) && (
           <TransactionDetailsRow
-            label={dn.gt(collChange, 0) ? "You deposit" : "You withdraw"}
+            label={dn.gt(displayedCollChange, 0) ? "You deposit" : "You withdraw"}
             value={[
               <div
                 key="start"
-                title={`${fmtnum(dn.abs(collChange), "full")} ${collateral.name}`}
+                title={`${fmtnum(dn.abs(displayedCollChange), "full")} ${collateral.name}`}
                 style={{
-                  color: dn.eq(collChange, 0n)
+                  color: dn.eq(displayedCollChange, 0n)
                     ? "var(--colors-content-alt2)"
                     : undefined,
                 }}
               >
-                {fmtnum(dn.abs(collChange))} {collateral.name}
+                {fmtnum(dn.abs(displayedCollChange))} {collateral.name}
               </div>,
               <Amount
                 key="end"
                 fallback="…"
                 prefix="$"
-                value={collPrice && dn.mul(dn.abs(collChange), collPrice)}
+                value={collPrice && dn.mul(dn.abs(displayedCollChange), collPrice)}
               />,
             ]}
           />
@@ -238,15 +240,26 @@ export const updateBorrowPosition: FlowDeclaration<Request, Step> = {
       18,
     ]);
 
+    const approvalAddress = getApprovalAddress(coll.symbol);
+
     // Collateral token needs to be approved if collChange > 0 and collToken != "ETH" (no LeverageWETHZapper)
-    const isCollApproved = coll.symbol === "ETH" || !dn.gt(collChange, 0) || !dn.gt(collChange, [
-      await readContract(wagmiConfig, {
+    const isCollApproved = await (async () => {
+      if (coll.symbol === 'ETH') {
+        return true;
+      }
+      if (!dn.gt(collChange, 0)) {
+        return true;
+      }
+      const normalizedCollChange = await getStERC20Amount(coll.symbol, collChange, wagmiConfig);
+      const allowance = [await readContract(wagmiConfig, {
         ...coll.contracts.CollToken,
+        address: approvalAddress,
         functionName: "allowance",
-        args: [account.address, Controller.address],
-      }) ?? 0n,
-      18,
-    ]);
+        args: [account.address!, Controller.address],
+      }), 18] as dn.Dnum;
+
+      return !dn.gt(normalizedCollChange, allowance);
+    })();
 
     return [
       isBoldApproved ? null : "approveBold" as const,
@@ -282,24 +295,17 @@ export const updateBorrowPosition: FlowDeclaration<Request, Step> = {
     }
 
     if (stepId === "approveColl") {
+      const approvalAddress = getApprovalAddress(collateral.symbol);
+      const approvalAmount = await getApprovalAmount(collateral.symbol, dn.abs(debtChange), wagmiConfig);
       return {
         ...collateral.contracts.CollToken,
+        address: approvalAddress,
         functionName: "approve",
         args: [
           Controller.address,
-          dn.abs(collChange)[0],
+          approvalAmount,
         ],
       };
-    }
-
-    const fetchNrERC20Amount =async (stERC20Amount: bigint) => {
-      const nrERC20Amount = await readContract(wagmiConfig, {
-        abi: NrERC20,
-        address: collateral.contracts.CollToken.address,
-        functionName: 'getNrERC20ByStERC20',
-        args: [stERC20Amount]
-      });
-      return nrERC20Amount;
     }
 
     // WETH zapper
@@ -318,21 +324,20 @@ export const updateBorrowPosition: FlowDeclaration<Request, Step> = {
           ],
           value: dn.gt(collChange, 0n) ? collChange[0] : 0n,
         }))
-        .with("depositColl", () => ({
-          ...LeverageWETHZapper,
-          functionName: "addCollWithRawETH",
-          args: [troveId],
-          value: dn.abs(collChange)[0] * 1000000000n,
-        }))
-        .with("withdrawColl", async () => {
-          const stERC20Amount = dn.abs(collChange)[0] * 1000000000n;
-          const withdrawAmount = await fetchNrERC20Amount(stERC20Amount);
+        .with("depositColl", async () => {
+          const normalizedCollChange = await getStERC20Amount(collateral.symbol, collChange, wagmiConfig);
           return ({
             ...LeverageWETHZapper,
-            functionName: "withdrawCollToRawETH",
-            args: [troveId, withdrawAmount],
+            functionName: "addCollWithRawETH",
+            args: [troveId],
+            value: normalizedCollChange[0],
           });
         })
+        .with("withdrawColl", () => ({
+          ...LeverageWETHZapper,
+          functionName: "withdrawCollToRawETH",
+          args: [troveId, dn.abs(collChange)[0]],
+        }))
         .with("depositBold", () => ({
           ...LeverageWETHZapper,
           functionName: "repayBold",
@@ -360,24 +365,19 @@ export const updateBorrowPosition: FlowDeclaration<Request, Step> = {
           maxUpfrontFee[0],
         ],
       }))
-      .with("depositColl", () => ({
-        ...LeverageLSTZapper,
-        functionName: "addColl",
-        args: [troveId, dn.abs(collChange)[0]],
-      }))
-      .with("withdrawColl", async () => {
-        let withdrawAmount = dn.abs(collChange)[0];
-        if (collateral.symbol === 'USDB') {
-          const stERC20Amount = withdrawAmount * 1000000000n;
-          const nrERC20Amount = await fetchNrERC20Amount(stERC20Amount);
-          withdrawAmount = nrERC20Amount;
-        }
+      .with("depositColl", async () => {
+        const normalizedCollChange = await getStERC20Amount(collateral.symbol, collChange, wagmiConfig);
         return ({
           ...LeverageLSTZapper,
-          functionName: "withdrawColl",
-          args: [troveId, withdrawAmount],
+          functionName: "addColl",
+          args: [troveId, normalizedCollChange[0]],
         });
       })
+      .with("withdrawColl", () => ({
+        ...LeverageLSTZapper,
+        functionName: "withdrawColl",
+        args: [troveId, dn.abs(collChange)[0]],
+      }))
       .with("depositBold", () => ({
         ...LeverageLSTZapper,
         functionName: "repayBold",

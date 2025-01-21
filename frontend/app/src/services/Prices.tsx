@@ -26,6 +26,7 @@ import * as v from "valibot";
 import { useReadContract } from "wagmi";
 import { NrERC20 } from "../abi/NrERC20";
 import { BOLD_TOKEN_SYMBOL, BOLDTokenSymbol } from "@liquity2/uikit";
+import { getIsNrERC20Token } from "./Ethereum";
 
 type PriceToken = "LQTY" | BOLDTokenSymbol | "LUSD" | CollateralSymbol;
 
@@ -63,7 +64,7 @@ function useWatchCollateralPrice(collateral: CollateralSymbol) {
   });
 
   const nrTokenAddress =  getCollateralTokenAddress(collateral);
-  const isNrERC20Token = ['ETH', 'USDB'].includes(collateral ?? '');
+  const isNrERC20Token = getIsNrERC20Token(collateral);
 
   const {data: stERC20PerToken} = useReadContract({
     abi: NrERC20,

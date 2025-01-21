@@ -14,7 +14,7 @@ import { useInputFieldValue } from "@/src/form-utils";
 import { fmtnum, formatRisk } from "@/src/formatting";
 import { getLoanDetails } from "@/src/liquity-math";
 import { getCollToken } from "@/src/liquity-utils";
-import { useAccount, useBalance } from "@/src/services/Ethereum";
+import { useAccount, useBalance, useNrERC20Amount, useStERC20Amount } from "@/src/services/Ethereum";
 import { usePrice } from "@/src/services/Prices";
 import { useTransactionFlow } from "@/src/services/TransactionFlow";
 import { riskLevelToStatusMode } from "@/src/uikit-utils";
@@ -59,11 +59,13 @@ export function PanelUpdateBorrowPosition({
   const [depositMode, setDepositMode] = useState<ValueUpdateMode>("add");
   const depositChange = useInputFieldValue((value) => dn.format(value));
 
+  const normalizedDepositChange = useNrERC20Amount(collToken.symbol, depositChange.parsed) ?? null;
+
   // deposit update
-  const newDeposit = depositChange.parsed && (
+  const newDeposit = normalizedDepositChange && (
     depositMode === "remove"
-      ? dn.sub(loan.deposit, depositChange.parsed)
-      : dn.add(loan.deposit, depositChange.parsed)
+      ? dn.sub(loan.deposit, normalizedDepositChange)
+      : dn.add(loan.deposit, normalizedDepositChange)
   );
 
   // debt change
@@ -96,6 +98,9 @@ export function PanelUpdateBorrowPosition({
       loan.borrowed,
     )
     : null;
+
+  const loanDeposit = useStERC20Amount(collToken.symbol, loan?.deposit);
+  const newLoanDeposit = useStERC20Amount(collToken.symbol, newDeposit);
 
   if (!collPrice) {
     return null;
@@ -189,13 +194,13 @@ export function PanelUpdateBorrowPosition({
             />
           }
           footer={{
-            end: loanDetails.deposit && newLoanDetails.deposit && (
+            end: loanDeposit && newLoanDeposit && (
               <Field.FooterInfo
                 label={
                   <HFlex alignItems="center" gap={8}>
                     <Amount
                       format={2}
-                      value={loanDetails.deposit}
+                      value={loanDeposit}
                     />
                     <div>{ARROW_RIGHT}</div>
                   </HFlex>
@@ -205,7 +210,7 @@ export function PanelUpdateBorrowPosition({
                     <Amount
                       format={2}
                       suffix={` ${collToken.name}`}
-                      value={newLoanDetails.deposit}
+                      value={newLoanDeposit}
                     />
                     <InfoTooltip heading="Collateral update">
                       <div>
@@ -213,7 +218,7 @@ export function PanelUpdateBorrowPosition({
                         <Amount
                           format={2}
                           suffix={` ${collToken.name}`}
-                          value={loanDetails.deposit}
+                          value={loanDeposit}
                         />
                         {collPrice && (
                           <>
@@ -221,7 +226,7 @@ export function PanelUpdateBorrowPosition({
                             <Amount
                               format={2}
                               prefix="$"
-                              value={dn.mul(loanDetails.deposit, collPrice)}
+                              value={dn.mul(loanDeposit, collPrice)}
                             />
                             {")"}
                           </>
@@ -232,7 +237,7 @@ export function PanelUpdateBorrowPosition({
                         <Amount
                           format={2}
                           suffix={` ${collToken.name}`}
-                          value={newLoanDetails.deposit}
+                          value={newLoanDeposit}
                         />
                         {collPrice && (
                           <>
@@ -240,7 +245,7 @@ export function PanelUpdateBorrowPosition({
                             <Amount
                               format={2}
                               prefix="$"
-                              value={dn.mul(newLoanDetails.deposit, collPrice)}
+                              value={dn.mul(newLoanDeposit, collPrice)}
                             />
                             {")"}
                           </>

@@ -19,6 +19,10 @@ import { BOLD_TOKEN_SYMBOL, Button, HFlex, IconBorrow, IconLeverage, StatusDot, 
 import { a, useSpring } from "@react-spring/web";
 import * as dn from "dnum";
 import { match, P } from "ts-pattern";
+import { NrERC20 } from "@/src/abi/NrERC20";
+import { useReadContract } from "wagmi";
+import { getContracts } from "@/src/contracts";
+import { useStERC20Amount } from "@/src/services/Ethereum";
 
 const LOAN_CARD_HEIGHT = 246 - 16;
 const LOAN_CARD_HEIGHT_REDUCED = 176;
@@ -40,13 +44,16 @@ export function LoanCard({
 }) {
   const collToken = getCollToken(loan?.collIndex ?? prevLoan?.collIndex ?? null);
 
-  if (!collToken) {
+  if (!collToken || !loan) {
     return null;
   }
 
   const collPriceUsd = usePrice(collToken.symbol);
 
   const isLoanClosing = prevLoan && !loan;
+
+  const loanDeposit = useStERC20Amount(collToken.symbol, loan.deposit);
+  const prevLoanDeposit = useStERC20Amount(collToken.symbol, prevLoan?.deposit);
 
   const loanDetails = loan && getLoanDetails(
     loan.deposit,
@@ -119,13 +126,13 @@ export function LoanCard({
                   </div>
                   {prevLoan && (
                     <div
-                      title={`${fmtnum(prevLoan.deposit, "full")} ${collToken.name}`}
+                      title={`${fmtnum(prevLoanDeposit, "full")} ${collToken.name}`}
                       className={css({
                         color: "contentAlt",
                         textDecoration: "line-through",
                       })}
                     >
-                      {fmtnum(prevLoan.deposit)} {collToken.name}
+                      {fmtnum(prevLoanDeposit)} {collToken.name}
                     </div>
                   )}
                 </div>
@@ -204,18 +211,18 @@ export function LoanCard({
                           gap: 8,
                         })}
                       >
-                        <div title={`${fmtnum(loan.deposit, "full")} ${collToken.name}`}>
-                          {fmtnum(loan.deposit)} {collToken.name}
+                        <div title={`${fmtnum(loanDeposit, "full")} ${collToken.name}`}>
+                          {fmtnum(loanDeposit)} {collToken.name}
                         </div>
-                        {prevLoan && !dn.eq(prevLoan.deposit, loan.deposit) && (
+                        {prevLoanDeposit && loanDeposit && !dn.eq(prevLoanDeposit, loanDeposit) && (
                           <div
-                            title={`${fmtnum(prevLoan.deposit, "full")} ${collToken.name}`}
+                            title={`${fmtnum(prevLoanDeposit, "full")} ${collToken.name}`}
                             className={css({
                               color: "contentAlt",
                               textDecoration: "line-through",
                             })}
                           >
-                            {fmtnum(prevLoan.deposit)} {collToken.name}
+                            {fmtnum(prevLoanDeposit)} {collToken.name}
                           </div>
                         )}
                       </div>

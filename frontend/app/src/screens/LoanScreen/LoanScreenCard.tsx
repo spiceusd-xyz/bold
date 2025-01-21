@@ -37,6 +37,7 @@ import * as dn from "dnum";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { match, P } from "ts-pattern";
+import { useStERC20Amount } from "@/src/services/Ethereum";
 
 type LoanMode = "borrow" | "leverage";
 
@@ -345,6 +346,7 @@ function LoanCard({
   nftUrl: string | null;
   onLeverageModeChange: (mode: LoanMode) => void;
 }) {
+  const loanDeposit = useStERC20Amount(props.collateral.symbol, props.loan.deposit);
   const [notifyCopy, setNotifyCopy] = useState(false);
 
   useEffect(() => {
@@ -639,14 +641,14 @@ function LoanCard({
                   {mode === "leverage"
                     ? (
                       <div
-                        title={`${fmtnum(loan.deposit, "full")} ${collateral}`}
+                        title={`${fmtnum(loanDeposit, "full")} ${collateral}`}
                         className={css({
                           display: "flex",
                           alignItems: "center",
                           gap: 12,
                         })}
                       >
-                        <div>{fmtnum(loan.deposit)}</div>
+                        <div>{fmtnum(loanDeposit)}</div>
                         <TokenIcon symbol={collateral.symbol} size={32} />
                         <div
                           className={css({
@@ -740,8 +742,8 @@ function LoanCard({
                       )
                       : (
                         <GridItem label="Collateral">
-                          <div title={`${fmtnum(loan.deposit, "full")} ${collateral.name}`}>
-                            {fmtnum(loan.deposit)} {collateral.name}
+                          <div title={`${fmtnum(loanDeposit, "full")} ${collateral.name}`}>
+                            {fmtnum(loanDeposit)} {collateral.name}
                           </div>
                         </GridItem>
                       )}

@@ -14,6 +14,10 @@ import { ADDRESS_ZERO, BOLD_TOKEN_SYMBOL } from "@liquity2/uikit";
 import * as dn from "dnum";
 import * as v from "valibot";
 import { readContract } from "wagmi/actions";
+import { useReadContract } from "wagmi";
+import { NrERC20 } from "../abi/NrERC20";
+import { getContracts } from "../contracts";
+import { useStERC20Amount } from "../services/Ethereum";
 
 const FlowIdSchema = v.literal("closeLoanPosition");
 
@@ -78,17 +82,23 @@ export const closeLoanPosition: FlowDeclaration<Request, Step> = {
 
     const collPrice = usePrice(collateral.symbol);
 
-    if (!collPrice) {
+    const amountToRepay = collPrice ? (
+        repayWithCollateral
+        ? (dn.div(loan.borrowed ?? dn.from(0), collPrice))
+        : (loan.borrowed ?? dn.from(0))
+     ) : undefined;
+
+    const collToReclaim = amountToRepay ? (
+      repayWithCollateral
+        ? dn.sub(loan.deposit, amountToRepay)
+        : loan.deposit
+    ) : undefined;
+  
+    const displayedCollToReclaim = useStERC20Amount(collateral.symbol, collToReclaim);
+
+    if (!amountToRepay || !collToReclaim) {
       return null;
     }
-
-    const amountToRepay = repayWithCollateral
-      ? (dn.div(loan.borrowed ?? dn.from(0), collPrice))
-      : (loan.borrowed ?? dn.from(0));
-
-    const collToReclaim = repayWithCollateral
-      ? dn.sub(loan.deposit, amountToRepay)
-      : loan.deposit;
 
     return (
       <>
@@ -107,7 +117,7 @@ export const closeLoanPosition: FlowDeclaration<Request, Step> = {
           value={[
             <Amount
               key="start"
-              value={collToReclaim}
+              value={displayedCollToReclaim}
               suffix={` ${collateral.symbol}`}
             />,
           ]}

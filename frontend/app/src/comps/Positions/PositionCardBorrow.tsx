@@ -13,6 +13,7 @@ import * as dn from "dnum";
 import Link from "next/link";
 import { PositionCard } from "./PositionCard";
 import { CardRow, CardRows } from "./shared";
+import { useStERC20Amount } from "@/src/services/Ethereum";
 
 export function PositionCardBorrow({
   batchManager,
@@ -45,11 +46,13 @@ export function PositionCardBorrow({
   const maxLtv = token && dn.from(1 / token.collateralRatio, 18);
   const liquidationRisk = ltv && maxLtv && getLiquidationRisk(ltv, maxLtv);
 
+  const displayedCollAmount = useStERC20Amount(token?.symbol, deposit);
+  
   const title = token
     ? [
       `Loan ID: ${shortenTroveId(troveId)}…`,
       `Borrowed: ${fmtnum(borrowed, "full")} ${BOLD_TOKEN_SYMBOL}`,
-      `Collateral: ${fmtnum(deposit, "full")} ${token.name}`,
+      `Collateral: ${fmtnum(displayedCollAmount, "full")} ${token.name}`,
       `Interest rate: ${fmtnum(interestRate, "full", 100)}%`,
     ]
     : [];
@@ -103,7 +106,7 @@ export function PositionCardBorrow({
                 alignItems: "cente",
               })}
             >
-              Backed by {deposit ? dn.format(deposit, 2) : "−"} {token.name}
+              Backed by {displayedCollAmount ? dn.format(displayedCollAmount, 2) : "−"} {token.name}
               <TokenIcon size="small" symbol={token.symbol} />
             </div>
           ),

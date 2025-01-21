@@ -2,12 +2,12 @@
 
 import "@rainbow-me/rainbowkit/styles.css";
 
-import type { Token } from "@/src/types";
-import type { Address } from "@liquity2/uikit";
+import type { CollIndex, Token } from "@/src/types";
+import type { Address, CollateralSymbol, TokenSymbol } from "@liquity2/uikit";
 import type { ComponentProps, ReactNode } from "react";
 import type { Chain } from "wagmi/chains";
 
-import { getContracts } from "@/src/contracts";
+import { Collateral, getCollateralContract, getContracts } from "@/src/contracts";
 import { ACCOUNT_BALANCES } from "@/src/demo-mode";
 import { useDemoMode } from "@/src/demo-mode";
 import * as dn from "dnum";
@@ -57,6 +57,8 @@ import {
   WagmiProvider,
 } from "wagmi";
 import { CONTRACT_USDB_TOKEN } from "../constants";
+import { NrERC20 } from "../abi/NrERC20";
+import { readContract } from "@wagmi/core";
 
 const queryClient = new QueryClient();
 
@@ -235,4 +237,85 @@ function createChain({
       multicall3: contractMulticall,
     },
   } satisfies Chain;
+}
+
+export function getIsNrERC20Token (symbol: TokenSymbol | null | undefined) {
+  return ['ETH', 'USDB'].includes(symbol ?? '');
+}
+
+export function useNrERC20Amount(symbol: CollateralSymbol | null, stERC20Amount: dn.Dnum | null | undefined) {
+  const isNrERC20Token = getIsNrERC20Token(symbol);
+
+  const {data: tokensPerStERC20} = useReadContract({
+    abi: NrERC20,
+    address: getCollateralContract(symbol, 'CollToken')?.address,
+    functionName: 'tokensPerStERC20',
+    query: {
+      enabled: isNrERC20Token,
+    }
+  });
+
+  if (!isNrERC20Token) {
+    return stERC20Amount;
+  }
+
+  if (!tokensPerStERC20 || !stERC20Amount) {
+    return;
+  }
+
+  return dn.setDecimals(dn.div(dn.mul(stERC20Amount, tokensPerStERC20), 1e9), 9);
+}
+
+
+export function useStERC20Amount(symbol: TokenSymbol | CollIndex | null | undefined, nrERC20Amount: dn.Dnum | null | undefined) {
+  const collateral = getContracts().collaterals.find(collateral => typeof symbol === 'number' ? collateral.collIndex === symbol : collateral.symbol === symbol);
+  const isNrERC20Token = getIsNrERC20Token(collateral?.symbol);
+
+  const {data: stERC20PerToken} = useReadContract({
+    abi: NrERC20,
+    address: collateral?.contracts.CollToken.address,
+    functionName: 'stERC20PerToken',
+    query: {
+      enabled: isNrERC20Token,
+    }
+  });
+
+  if (!isNrERC20Token) {
+    return nrERC20Amount;
+  }
+
+  if (!stERC20PerToken || !nrERC20Amount) {
+    return;
+  }
+
+  return dn.div(dn.mul(dn.setDecimals(nrERC20Amount, 18), stERC20PerToken), 1e18);
+}
+
+export async function getStERC20Amount(symbol: CollateralSymbol, collAmount: dn.Dnum, wagmiConfig: ReturnType<typeof useWagmiConfig>) {
+  const collateral = getContracts().collaterals.find(collateral => typeof symbol === 'number' ? collateral.collIndex === symbol : collateral.symbol === symbol)!;
+  const isNrERC20Token = getIsNrERC20Token(collateral?.symbol);
+
+  if (!isNrERC20Token) {
+    return collAmount;
+  }
+
+  const stERC20PerToken = await readContract(wagmiConfig, {
+    abi: NrERC20,
+    address: getCollateralContract(symbol, 'CollToken')?.address ?? '0x',
+    functionName: 'stERC20PerToken',
+  });
+
+  return dn.div(dn.mul(dn.setDecimals(collAmount, 18), stERC20PerToken), 1e18);
+}
+
+
+export function getApprovalAddress (symbol: CollateralSymbol) {
+  return symbol === 'USDB' ? CONTRACT_USDB_TOKEN :
+    getContracts().collaterals.find(collateral => collateral.symbol === symbol)!.contracts.CollToken.address;
+}
+
+export async function getApprovalAmount (symbol: CollateralSymbol, collAmount: dn.Dnum, wagmiConfig: ReturnType<typeof useWagmiConfig>): Promise<bigint> { 
+  const stERC20Amount = await getStERC20Amount(symbol, collAmount, wagmiConfig);
+  const approvalAmount = dn.mul(stERC20Amount, 1.01);
+  return approvalAmount[0];
 }

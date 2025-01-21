@@ -17,6 +17,7 @@ import * as v from "valibot";
 import { parseEventLogs } from "viem";
 import { readContract } from "wagmi/actions";
 import { Collateral } from "../contracts";
+import { getApprovalAddress, getApprovalAmount, getStERC20Amount, useStERC20Amount } from "../services/Ethereum";
 
 const FlowIdSchema = v.literal("openBorrowPosition");
 
@@ -61,10 +62,6 @@ type Step =
   | "openTroveEth"
   | "openTroveLst";
 
-function getApprovalAddress (collateral: Collateral) {
-  return collateral.symbol === 'USDB' ? CONTRACT_USDB_TOKEN :  collateral.contracts.CollToken.address;
-}
-
 export const openBorrowPosition: FlowDeclaration<Request, Step> = {
   title: "Review & Send Transaction",
 
@@ -104,6 +101,8 @@ export const openBorrowPosition: FlowDeclaration<Request, Step> = {
     const collateral = getCollToken(flow.request.collIndex);
     const collPrice = usePrice(collateral?.symbol ?? null);
 
+    const displayedCollAmount = useStERC20Amount(collateral?.symbol, request.collAmount);
+
     const upfrontFee = usePredictOpenTroveUpfrontFee(
       request.collIndex,
       request.boldAmount,
@@ -116,12 +115,12 @@ export const openBorrowPosition: FlowDeclaration<Request, Step> = {
         <TransactionDetailsRow
           label="Collateral"
           value={[
-            `${fmtnum(request.collAmount)} ${collateral.name}`,
+            `${fmtnum(displayedCollAmount)} ${collateral.name}`,
             <Amount
               key="end"
               fallback="…"
               prefix="$"
-              value={collPrice && dn.mul(request.collAmount, collPrice)}
+              value={collPrice && displayedCollAmount && dn.mul(displayedCollAmount, collPrice)}
             />,
           ]}
         />
@@ -202,28 +201,41 @@ export const openBorrowPosition: FlowDeclaration<Request, Step> = {
 
     const { LeverageLSTZapper, CollToken } = collateral.contracts;
 
-    const approvalAddress = getApprovalAddress(collateral);
+    const approvalAddress = getApprovalAddress(collateral.symbol);
 
     if (!LeverageLSTZapper || !CollToken) {
       throw new Error(`Collateral ${collateral.symbol} not supported`);
     }
 
-    const allowance = dnum18(
-      await readContract(wagmiConfig, {
-        ...CollToken,
+    // const allowance = dnum18(
+    //   await readContract(wagmiConfig, {
+    //     ...CollToken,
+    //     address: approvalAddress,
+    //     functionName: "allowance",
+    //     args: [
+    //       account.address ?? ADDRESS_ZERO,
+    //       LeverageLSTZapper.address,
+    //     ],
+    //   }),
+    // );
+    //
+    // const isApproved = !dn.gt(
+    //   dn.add(request.collAmount, ETH_GAS_COMPENSATION),
+    //   allowance,
+    // );
+
+    // Collateral token needs to be approved if collChange > 0 and collToken != "ETH" (no LeverageWETHZapper)
+    const isApproved = await (async () => {
+      const normalizedCollChange = await getStERC20Amount(collateral.symbol, request.collAmount, wagmiConfig);
+      const allowance = [await readContract(wagmiConfig, {
+        ...collateral.contracts.CollToken,
         address: approvalAddress,
         functionName: "allowance",
-        args: [
-          account.address ?? ADDRESS_ZERO,
-          LeverageLSTZapper.address,
-        ],
-      }),
-    );
+        args: [account.address!, LeverageLSTZapper.address],
+      }), 18] as dn.Dnum;
 
-    const isApproved = !dn.gt(
-      dn.add(request.collAmount, ETH_GAS_COMPENSATION),
-      allowance,
-    );
+      return !dn.gt(normalizedCollChange, allowance);
+    })();
 
     const steps: Step[] = [];
 
@@ -266,7 +278,7 @@ export const openBorrowPosition: FlowDeclaration<Request, Step> = {
     return null;
   },
 
-  async writeContractParams(stepId, { contracts, request }) {
+  async writeContractParams(stepId, { contracts, request, wagmiConfig }) {
     const collateral = contracts.collaterals[request.collIndex];
     
     const { LeverageLSTZapper, CollToken } = collateral.contracts;
@@ -275,20 +287,23 @@ export const openBorrowPosition: FlowDeclaration<Request, Step> = {
     }
     
     if (stepId === "approveLst") {
-      const approvalAddress = getApprovalAddress(collateral);
+      const approvalAddress = getApprovalAddress(collateral.symbol);
+      const approvalAmount = await getApprovalAmount(collateral.symbol, dn.abs(request.collAmount), wagmiConfig);
+      
       return {
         ...CollToken,
         address: approvalAddress,
         functionName: "approve" as const,
         args: [
           LeverageLSTZapper.address,
-          dn.add(request.collAmount, ETH_GAS_COMPENSATION)[0],
+          approvalAmount,
         ],
       };
     }
 
     // LeverageWETHZapper mode
     if (stepId === "openTroveEth") {
+      const normalizedCollAmount = await getStERC20Amount(collateral.symbol, request.collAmount, wagmiConfig);
       return {
         ...collateral.contracts.LeverageWETHZapper,
         functionName: "openTroveWithRawETH" as const,
@@ -310,19 +325,20 @@ export const openBorrowPosition: FlowDeclaration<Request, Step> = {
           removeManager: ADDRESS_ZERO,
           receiver: ADDRESS_ZERO,
         }],
-        value: request.collAmount[0] + ETH_GAS_COMPENSATION[0],
+        value: normalizedCollAmount[0] + ETH_GAS_COMPENSATION[0],
       };
     }
 
     // LeverageLSTZapper mode
     if (stepId === "openTroveLst") {
+      const normalizedCollAmount = await getStERC20Amount(collateral.symbol, request.collAmount, wagmiConfig);
       return {
         ...collateral.contracts.LeverageLSTZapper,
         functionName: "openTroveWithRawETH" as const,
         args: [{
           owner: request.owner ?? ADDRESS_ZERO,
           ownerIndex: BigInt(request.ownerIndex),
-          collAmount: request.collAmount[0],
+          collAmount: normalizedCollAmount[0],
           boldAmount: request.boldAmount[0],
           upperHint: request.upperHint[0],
           lowerHint: request.lowerHint[0],
