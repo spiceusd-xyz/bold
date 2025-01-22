@@ -69,7 +69,7 @@ function useCollateralPrice(symbol: null | CollateralSymbol): UseQueryResult<Dnu
       })
 
       const nrTokenPrice = rawPrice;
-      const stTokenPrice = dn.div(dn.mul(nrTokenPrice, BigInt(1e9)), stERC20PerToken)[0];
+      const stTokenPrice = dn.div(dn.mul(nrTokenPrice, BigInt(1e9)), stERC20PerToken);
 
       return stTokenPrice;
     },
