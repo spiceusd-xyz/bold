@@ -311,19 +311,22 @@ export const updateBorrowPosition: FlowDeclaration<Request, Step> = {
     // WETH zapper
     if (collateral.symbol === "ETH") {
       return await match(stepId)
-        .with("adjustTrove", () => ({
-          ...LeverageWETHZapper,
-          functionName: "adjustTroveWithRawETH",
-          args: [
-            troveId,
-            dn.abs(collChange)[0],
-            !dn.lt(collChange, 0n),
-            dn.abs(debtChange)[0],
-            !dn.lt(debtChange, 0n),
-            maxUpfrontFee[0],
-          ],
-          value: dn.gt(collChange, 0n) ? collChange[0] : 0n,
-        }))
+        .with("adjustTrove", async () => {
+          const normalizedCollChange = await getStERC20Amount(collateral.symbol, collChange, wagmiConfig);
+          return ({
+            ...LeverageWETHZapper,
+            functionName: "adjustTroveWithRawETH",
+            args: [
+              troveId,
+              dn.abs(normalizedCollChange)[0],
+              !dn.lt(collChange, 0n),
+              dn.abs(debtChange)[0],
+              !dn.lt(debtChange, 0n),
+              maxUpfrontFee[0],
+            ],
+            value: dn.gt(normalizedCollChange, 0n) ? normalizedCollChange[0] : 0n,
+          });
+        })
         .with("depositColl", async () => {
           const normalizedCollChange = await getStERC20Amount(collateral.symbol, collChange, wagmiConfig);
           return ({
@@ -353,18 +356,21 @@ export const updateBorrowPosition: FlowDeclaration<Request, Step> = {
 
     // GasComp zapper
     return await match(stepId)
-      .with("adjustTrove", () => ({
-        ...LeverageLSTZapper,
-        functionName: "adjustTrove",
-        args: [
-          troveId,
-          dn.abs(collChange)[0],
-          !dn.lt(collChange, 0n),
-          dn.abs(debtChange)[0],
-          !dn.lt(debtChange, 0n),
-          maxUpfrontFee[0],
-        ],
-      }))
+      .with("adjustTrove", async () => {
+        const normalizedCollChange = await getStERC20Amount(collateral.symbol, collChange, wagmiConfig);
+        return ({
+          ...LeverageLSTZapper,
+          functionName: "adjustTrove",
+          args: [
+            troveId,
+            dn.abs(normalizedCollChange)[0],
+            !dn.lt(collChange, 0n),
+            dn.abs(debtChange)[0],
+            !dn.lt(debtChange, 0n),
+            maxUpfrontFee[0],
+          ],
+        });
+      })
       .with("depositColl", async () => {
         const normalizedCollChange = await getStERC20Amount(collateral.symbol, collChange, wagmiConfig);
         return ({
