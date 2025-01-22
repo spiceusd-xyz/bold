@@ -52,6 +52,11 @@ export function PanelUpdateBorrowPosition({
     throw new Error("collToken not found");
   }
 
+  // balances
+  const collBalance = useBalance(account.address, collToken.symbol);
+  const boldBalance = useBalance(account.address, BOLD_TOKEN_SYMBOL);
+
+  // prices
   const collPrice = usePrice(collToken.symbol ?? null);
   const boldPriceUsd = usePrice(BOLD_TOKEN_SYMBOL) ?? dnum18(0);
 
@@ -71,16 +76,12 @@ export function PanelUpdateBorrowPosition({
   // debt change
   const [debtMode, setDebtMode] = useState<ValueUpdateMode>("add");
   const debtChange = useInputFieldValue((value) => dn.format(value));
-  const debtChangeUsd = debtChange.parsed && dn.mul(debtChange.parsed, boldPriceUsd);
 
   const newDebt = debtChange.parsed && (
     debtMode === "remove"
       ? dn.sub(loan.borrowed, debtChange.parsed)
       : dn.add(loan.borrowed, debtChange.parsed)
   );
-
-  const collBalance = useBalance(account.address, collToken.symbol);
-  const boldBalance = useBalance(account.address, BOLD_TOKEN_SYMBOL);
 
   const collMax = depositMode === "remove" ? null : (
     collBalance.data && dnumMax(
@@ -102,16 +103,18 @@ export function PanelUpdateBorrowPosition({
   const loanDeposit = useStERC20Amount(collToken.symbol, loan?.deposit);
   const newLoanDeposit = useStERC20Amount(collToken.symbol, newDeposit);
 
-  if (!collPrice) {
+  if (!collPrice.data || !boldPriceUsd.data) {
     return null;
   }
+
+  const debtChangeUsd = debtChange.parsed && dn.mul(debtChange.parsed, boldPriceUsd.data);
 
   const loanDetails = getLoanDetails(
     loan.deposit,
     loan.borrowed,
     loan.interestRate,
     collToken.collateralRatio,
-    collPrice,
+    collPrice.data,
   );
 
   const newLoanDetails = getLoanDetails(
@@ -119,19 +122,29 @@ export function PanelUpdateBorrowPosition({
     newDebt,
     loanDetails.interestRate,
     collToken.collateralRatio,
-    collPrice,
+    collPrice.data,
   );
 
   const isBelowMinDebt = debtChange.parsed && !debtChange.isEmpty && newDebt && dn.lt(newDebt, MIN_DEBT);
 
-  const allowSubmit = (
-    account.isConnected
-  ) && (
-    !dn.eq(loanDetails.deposit ?? dnum18(0), newLoanDetails.deposit ?? dnum18(0))
-    || !dn.eq(loanDetails.debt ?? dnum18(0), newLoanDetails.debt ?? dnum18(0))
-  ) && (
-    !isBelowMinDebt
-  );
+  const insufficientBold = debtMode === "remove"
+    && debtChange.parsed
+    && !debtChange.isEmpty
+    && boldBalance.data
+    && dn.gt(debtChange.parsed, boldBalance.data);
+
+  const allowSubmit = account.isConnected
+    // above min. debt
+    && !isBelowMinDebt
+    // the new deposit must be positive
+    && dn.gt(newLoanDetails.deposit ?? dnum18(0), 0)
+    // the account must have enough BOLD
+    && !insufficientBold
+    // there should be a change in the deposit or debt
+    && (
+      !dn.eq(loanDetails.deposit ?? dnum18(0), newLoanDetails.deposit ?? dnum18(0))
+      || !dn.eq(loanDetails.debt ?? dnum18(0), newLoanDetails.debt ?? dnum18(0))
+    );
 
   return (
     <>
@@ -176,8 +189,8 @@ export function PanelUpdateBorrowPosition({
               secondary={{
                 start: (
                   <Amount
-                    value={depositChange.parsed && collPrice
-                      ? dn.mul(depositChange.parsed, collPrice)
+                    value={depositChange.parsed
+                      ? dn.mul(depositChange.parsed, collPrice.data)
                       : 0}
                     suffix="$"
                   />
@@ -207,11 +220,20 @@ export function PanelUpdateBorrowPosition({
                 }
                 value={
                   <HFlex alignItems="center" gap={8}>
-                    <Amount
-                      format={2}
-                      suffix={` ${collToken.name}`}
-                      value={newLoanDeposit}
-                    />
+                    <div
+                      className={css({
+                        "--color-error": "token(colors.negativeStrong)",
+                      })}
+                      style={{
+                        color: dn.lt(newLoanDeposit, 0) ? "var(--color-error)" : "inherit",
+                      }}
+                    >
+                      <Amount
+                        format={2}
+                        suffix={` ${collToken.name}`}
+                        value={newLoanDeposit}
+                      />
+                    </div>
                     <InfoTooltip heading="Collateral update">
                       <div>
                         Before:{" "}
@@ -220,17 +242,13 @@ export function PanelUpdateBorrowPosition({
                           suffix={` ${collToken.name}`}
                           value={loanDeposit}
                         />
-                        {collPrice && (
-                          <>
-                            {" ("}
-                            <Amount
-                              format={2}
-                              prefix="$"
-                              value={dn.mul(loanDeposit, collPrice)}
-                            />
-                            {")"}
-                          </>
-                        )}
+                        {" ("}
+                        <Amount
+                          format={2}
+                          prefix="$"
+                          value={dn.mul(loanDeposit, collPrice.data)}
+                        />
+                        {")"}
                       </div>
                       <div>
                         After:{" "}
@@ -239,17 +257,13 @@ export function PanelUpdateBorrowPosition({
                           suffix={` ${collToken.name}`}
                           value={newLoanDeposit}
                         />
-                        {collPrice && (
-                          <>
-                            {" ("}
-                            <Amount
-                              format={2}
-                              prefix="$"
-                              value={dn.mul(newLoanDeposit, collPrice)}
-                            />
-                            {")"}
-                          </>
-                        )}
+                        {" ("}
+                        <Amount
+                          format={2}
+                          prefix="$"
+                          value={dn.mul(newLoanDeposit, collPrice.data)}
+                        />
+                        {")"}
                       </div>
                     </InfoTooltip>
                   </HFlex>
@@ -273,6 +287,8 @@ export function PanelUpdateBorrowPosition({
               }
               drawer={!debtChange.isFocused && isBelowMinDebt
                 ? { mode: "error", message: `You must borrow at least ${fmtnum(MIN_DEBT, 2)} ${BOLD_TOKEN_SYMBOL}.` }
+                : insufficientBold
+                ? { mode: "error", message: `Insufficient ${BOLD_TOKEN_SYMBOL} balance.` }
                 : null}
               label={{
                 start: debtMode === "remove"
@@ -379,12 +395,16 @@ export function PanelUpdateBorrowPosition({
               {
                 label: <abbr title="Loan-to-value ratio">LTV</abbr>,
                 before: <Amount value={loanDetails.ltv} percentage />,
-                after: <Amount value={newLoanDetails.ltv} percentage />,
+                after: newLoanDetails.ltv && dn.gt(newLoanDetails.ltv, 0)
+                  ? <Amount value={newLoanDetails.ltv} percentage />
+                  : "N/A",
               },
               {
                 label: "Liquidation price",
-                before: <Amount value={loanDetails.liquidationPrice} />,
-                after: <Amount value={newLoanDetails.liquidationPrice} />,
+                before: <Amount prefix="$" value={loanDetails.liquidationPrice} />,
+                after: newLoanDetails.liquidationPrice
+                  ? <Amount prefix="$" value={newLoanDetails.liquidationPrice} />
+                  : "N/A",
               },
             ]}
           />

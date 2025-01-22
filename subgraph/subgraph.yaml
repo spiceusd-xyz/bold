@@ -6,8 +6,8 @@ dataSources:
     name: BoldToken
     source:
       abi: BoldToken
-      address: "0x620ce1130f7c63457784cdfa31cfccbfb6be5029"
-      startBlock: 7129282
+      address: "0x0a69fa2a565bd6fa9c3890ecaa30b149aaf99136"
+      startBlock: 7314166
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -27,6 +27,8 @@ dataSources:
           file: ../contracts/out/ERC20.sol/ERC20.json
         - name: TroveManager
           file: ../contracts/out/TroveManager.sol/TroveManager.json
+        - name: TroveNFT
+          file: ../contracts/out/TroveNFT.sol/TroveNFT.json
       eventHandlers:
         - event: CollateralRegistryAddressChanged(address)
           handler: handleCollateralRegistryAddressChanged
@@ -36,8 +38,8 @@ dataSources:
     name: Governance
     source:
       abi: Governance
-      address: "0x16fda5823f296c24125be4976fd6cec9fab9da2e"
-      startBlock: 7129475
+      address: "0x7eedda08119826757c98a4680e94f3b5e1f33af6"
+      startBlock: 7314318
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -49,24 +51,24 @@ dataSources:
         - GovernanceUser
       abis:
         - name: Governance
-          file: ./abi/Governance.json
+          file: ../contracts/out/Governance.sol/Governance.json
       eventHandlers:
-        - event: AllocateLQTY(address,address,int256,int256,uint16)
+        - event: AllocateLQTY(indexed address,indexed address,int256,int256,uint256,uint8)
           handler: handleAllocateLQTY
-        - event: ClaimForInitiative(address,uint256,uint256)
+        - event: ClaimForInitiative(indexed address,uint256,uint256,uint8)
           handler: handleClaimForInitiative
-        - event: DepositLQTY(address,uint256)
+        - event: DepositLQTY(indexed
+            address,address,uint256,uint256,uint256,uint256,uint256)
           handler: handleDepositLQTY
-        - event: RegisterInitiative(address,address,uint16)
+        - event: RegisterInitiative(address,address,uint256,uint8)
           handler: handleRegisterInitiative
-        - event: SnapshotVotesForInitiative(address,uint240,uint16)
+        - event: SnapshotVotesForInitiative(indexed address,uint256,uint256,uint256)
           handler: handleSnapshotVotesForInitiative
-        - event: UnregisterInitiative(address,uint16)
+        - event: UnregisterInitiative(address,uint256,uint8)
           handler: handleUnregisterInitiative
-        - event: WithdrawLQTY(address,uint256,uint256,uint256)
+        - event: WithdrawLQTY(indexed
+            address,address,uint256,uint256,uint256,uint256,uint256,uint256)
           handler: handleWithdrawLQTY
-      blockHandlers:
-        - handler: handleBlock
       file: ./src/Governance.mapping.ts
     network: sepolia
 templates:
@@ -99,6 +101,25 @@ templates:
         - event: BatchUpdated(indexed
             address,uint8,uint256,uint256,uint256,uint256,uint256,uint256)
           handler: handleBatchUpdated
+  - name: TroveNFT
+    kind: ethereum/contract
+    network: sepolia
+    source:
+      abi: TroveNFT
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      file: ./src/TroveNFT.mapping.ts
+      entities:
+        - BorrowerInfo
+        - Trove
+      abis:
+        - name: TroveNFT
+          file: ../contracts/out/TroveNFT.sol/TroveNFT.json
+      eventHandlers:
+        - event: Transfer(indexed address,indexed address,indexed uint256)
+          handler: handleTransfer
   - name: StabilityPool
     kind: ethereum/contract
     network: sepolia
