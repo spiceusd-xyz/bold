@@ -3,50 +3,34 @@ import type { FlowDeclaration } from "@/src/services/TransactionFlow";
 import { Amount } from "@/src/comps/Amount/Amount";
 import { EarnPositionSummary } from "@/src/comps/EarnPositionSummary/EarnPositionSummary";
 import { TransactionDetailsRow } from "@/src/screens/TransactionsScreen/TransactionsScreen";
+import { TransactionStatus } from "@/src/screens/TransactionsScreen/TransactionStatus";
 import { usePrice } from "@/src/services/Prices";
 import { vCollIndex, vPositionEarn } from "@/src/valibot-utils";
 import * as dn from "dnum";
 import * as v from "valibot";
 import { BOLD_TOKEN_SYMBOL } from "@liquity2/uikit";
+import { writeContract } from "wagmi/actions";
+import { createRequestSchema, verifyTransaction } from "./shared";
 
-const FlowIdSchema = v.literal("earnDeposit");
-
-const RequestSchema = v.object({
-  flowId: FlowIdSchema,
-  backLink: v.union([
-    v.null(),
-    v.tuple([
-      v.string(), // path
-      v.string(), // label
+const RequestSchema = createRequestSchema(
+  "earnDeposit",
+  {
+    prevEarnPosition: v.union([
+      v.null(),
+      vPositionEarn(),
     ]),
-  ]),
-  successLink: v.tuple([
-    v.string(), // path
-    v.string(), // label
-  ]),
-  successMessage: v.string(),
-  prevEarnPosition: v.union([
-    v.null(),
-    vPositionEarn(),
-  ]),
-  earnPosition: vPositionEarn(),
-  collIndex: vCollIndex(),
-  claim: v.boolean(),
-});
+    earnPosition: vPositionEarn(),
+    collIndex: vCollIndex(),
+    claim: v.boolean(),
+  },
+);
 
-export type Request = v.InferOutput<typeof RequestSchema>;
+export type EarnDepositRequest = v.InferOutput<typeof RequestSchema>;
 
-type Step = "provideToStabilityPool";
-
-const stepNames: Record<Step, string> = {
-  provideToStabilityPool: "Add deposit",
-};
-
-export const earnDeposit: FlowDeclaration<Request, Step> = {
+export const earnDeposit: FlowDeclaration<EarnDepositRequest> = {
   title: "Review & Send Transaction",
 
-  Summary({ flow }) {
-    const { request } = flow;
+  Summary({ request }) {
     return (
       <EarnPositionSummary
         collIndex={request.collIndex}
@@ -57,8 +41,7 @@ export const earnDeposit: FlowDeclaration<Request, Step> = {
     );
   },
 
-  Details({ flow }) {
-    const { request } = flow;
+  Details({ request }) {
     const boldPrice = usePrice(BOLD_TOKEN_SYMBOL);
     const boldAmount = dn.sub(
       request.earnPosition.deposit,
@@ -77,7 +60,7 @@ export const earnDeposit: FlowDeclaration<Request, Step> = {
             <Amount
               key="end"
               prefix="$"
-              value={boldPrice && dn.mul(boldAmount, boldPrice)}
+              value={boldPrice.data && dn.mul(boldAmount, boldPrice.data)}
             />,
           ]}
         />
@@ -85,31 +68,42 @@ export const earnDeposit: FlowDeclaration<Request, Step> = {
     );
   },
 
+  steps: {
+    provideToStabilityPool: {
+      name: () => "Add deposit",
+      Status: TransactionStatus,
+
+      async commit({ contracts, request, wagmiConfig }) {
+        const collateral = contracts.collaterals[request.collIndex];
+        if (!collateral) {
+          throw new Error("Invalid collateral index: " + request.collIndex);
+        }
+        const boldAmount = dn.sub(
+          request.earnPosition.deposit,
+          request.prevEarnPosition?.deposit ?? dn.from(0, 18),
+        );
+
+        return writeContract(wagmiConfig, {
+          ...collateral.contracts.StabilityPool,
+          functionName: "provideToSP",
+          args: [
+            boldAmount[0],
+            request.claim,
+          ],
+        });
+      },
+
+      async verify({ wagmiConfig, isSafe }, hash) {
+        await verifyTransaction(wagmiConfig, hash, isSafe);
+      },
+    },
+  },
+
   async getSteps() {
     return ["provideToStabilityPool"];
   },
 
-  getStepName(stepId) {
-    return stepNames[stepId];
-  },
-
   parseRequest(request) {
     return v.parse(RequestSchema, request);
-  },
-
-  async writeContractParams(_stepId, { contracts, request }) {
-    const collateral = contracts.collaterals[request.collIndex];
-    const boldAmount = dn.sub(
-      request.earnPosition.deposit,
-      request.prevEarnPosition?.deposit ?? dn.from(0, 18),
-    );
-    return {
-      ...collateral.contracts.StabilityPool,
-      functionName: "provideToSP",
-      args: [
-        boldAmount[0],
-        request.claim,
-      ],
-    };
   },
 };

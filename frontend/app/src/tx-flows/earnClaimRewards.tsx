@@ -4,40 +4,28 @@ import { Amount } from "@/src/comps/Amount/Amount";
 import { EarnPositionSummary } from "@/src/comps/EarnPositionSummary/EarnPositionSummary";
 import { getCollToken } from "@/src/liquity-utils";
 import { TransactionDetailsRow } from "@/src/screens/TransactionsScreen/TransactionsScreen";
+import { TransactionStatus } from "@/src/screens/TransactionsScreen/TransactionStatus";
 import { usePrice } from "@/src/services/Prices";
 import { vPositionEarn } from "@/src/valibot-utils";
 import * as dn from "dnum";
 import * as v from "valibot";
 import { BOLD_TOKEN_SYMBOL } from "@liquity2/uikit";
+import { writeContract } from "wagmi/actions";
+import { createRequestSchema, verifyTransaction } from "./shared";
 
-const FlowIdSchema = v.literal("earnClaimRewards");
+const RequestSchema = createRequestSchema(
+  "earnClaimRewards",
+  {
+    earnPosition: vPositionEarn(),
+  },
+);
 
-const RequestSchema = v.object({
-  flowId: FlowIdSchema,
-  backLink: v.union([
-    v.null(),
-    v.tuple([
-      v.string(), // path
-      v.string(), // label
-    ]),
-  ]),
-  successLink: v.tuple([
-    v.string(), // path
-    v.string(), // label
-  ]),
-  successMessage: v.string(),
-  earnPosition: vPositionEarn(),
-});
+export type EarnClaimRewardsRequest = v.InferOutput<typeof RequestSchema>;
 
-export type Request = v.InferOutput<typeof RequestSchema>;
-
-type Step = "claimRewards";
-
-export const earnClaimRewards: FlowDeclaration<Request, Step> = {
+export const earnClaimRewards: FlowDeclaration<EarnClaimRewardsRequest> = {
   title: "Review & Send Transaction",
 
-  Summary({ flow }) {
-    const { request } = flow;
+  Summary({ request }) {
     return (
       <EarnPositionSummary
         collIndex={request.earnPosition.collIndex}
@@ -47,8 +35,7 @@ export const earnClaimRewards: FlowDeclaration<Request, Step> = {
     );
   },
 
-  Details({ flow }) {
-    const { request } = flow;
+  Details({ request }) {
     const collateral = getCollToken(request.earnPosition.collIndex);
 
     if (!collateral) {
@@ -60,8 +47,8 @@ export const earnClaimRewards: FlowDeclaration<Request, Step> = {
 
     const rewardsBold = request.earnPosition.rewards.bold;
     const rewardsColl = request.earnPosition.rewards.coll;
-    const rewardsBoldUsd = boldPrice && dn.mul(rewardsBold, boldPrice);
-    const rewardsCollUsd = collPrice && dn.mul(rewardsColl, collPrice);
+    const rewardsBoldUsd = boldPrice.data && dn.mul(rewardsBold, boldPrice.data);
+    const rewardsCollUsd = collPrice.data && dn.mul(rewardsColl, collPrice.data);
 
     return (
       <>
@@ -99,24 +86,37 @@ export const earnClaimRewards: FlowDeclaration<Request, Step> = {
     );
   },
 
+  steps: {
+    claimRewards: {
+      name: () => "Claim rewards",
+      Status: TransactionStatus,
+
+      async commit({ contracts, request, wagmiConfig }) {
+        const { collIndex } = request.earnPosition;
+        const collateral = contracts.collaterals[collIndex];
+        if (!collateral) {
+          throw new Error("Invalid collateral index: " + collIndex);
+        }
+
+        const { StabilityPool } = collateral.contracts;
+        return writeContract(wagmiConfig, {
+          ...StabilityPool,
+          functionName: "withdrawFromSP",
+          args: [0n, true],
+        });
+      },
+
+      async verify({ wagmiConfig, isSafe }, hash) {
+        await verifyTransaction(wagmiConfig, hash, isSafe);
+      },
+    },
+  },
+
   async getSteps() {
     return ["claimRewards"];
   },
 
-  getStepName() {
-    return "Claim rewards"; // single step
-  },
-
   parseRequest(request) {
     return v.parse(RequestSchema, request);
-  },
-
-  async writeContractParams(_stepId, { contracts, request }) {
-    const collateral = contracts.collaterals[request.earnPosition.collIndex];
-    return {
-      ...collateral.contracts.StabilityPool,
-      functionName: "withdrawFromSP",
-      args: [0n, true],
-    };
   },
 };

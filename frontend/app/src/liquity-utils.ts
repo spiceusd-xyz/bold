@@ -24,7 +24,7 @@ import { useQuery } from "@tanstack/react-query";
 import * as dn from "dnum";
 import { useMemo } from "react";
 import { encodeAbiParameters, keccak256, parseAbiParameters } from "viem";
-import { useReadContract, useReadContracts } from "wagmi";
+import { useBalance, useReadContract, useReadContracts } from "wagmi";
 
 export function shortenTroveId(troveId: TroveId, chars = 8) {
   return troveId.length < chars * 2 + 2
@@ -45,6 +45,9 @@ export function parsePrefixedTroveId(value: PrefixedTroveId): {
   troveId: TroveId;
 } {
   const [collIndex_, troveId] = value.split(":");
+  if (!collIndex_ || !troveId) {
+    throw new Error(`Invalid prefixed trove ID: ${value}`);
+  }
   const collIndex = parseInt(collIndex_, 10);
   if (!isCollIndex(collIndex) || !isTroveId(troveId)) {
     throw new Error(`Invalid prefixed trove ID: ${value}`);
@@ -61,15 +64,13 @@ export function getCollToken(collIndex: CollIndex | null): CollateralToken | nul
   if (collIndex === null) {
     return null;
   }
-  const collToken = collaterals.map(({ symbol }) => {
+  return collaterals.map(({ symbol }) => {
     const collateral = COLLATERALS.find((c) => c.symbol === symbol);
     if (!collateral) {
       throw new Error(`Unknown collateral symbol: ${symbol}`);
     }
     return collateral;
-  })[collIndex];
-
-  return collToken;
+  })[collIndex] ?? null;
 }
 
 export function getCollIndexFromSymbol(symbol: CollateralSymbol | null): CollIndex | null {
@@ -180,38 +181,76 @@ function earnPositionFromGraph(
 
 export function useStakePosition(address: null | Address) {
   const LqtyStaking = getProtocolContract("LqtyStaking");
+  const LusdToken = getProtocolContract("LusdToken");
+  const Governance = getProtocolContract("Governance");
+
+  const userProxyAddress = useReadContract({
+    ...Governance,
+    functionName: "deriveUserProxyAddress",
+    args: [address ?? "0x"],
+    query: { enabled: Boolean(address) },
+  });
+
+  const userProxyBalance = useBalance({
+    address: userProxyAddress.data ?? "0x",
+    query: { enabled: Boolean(address) && userProxyAddress.isSuccess },
+  });
+
   return useReadContracts({
     contracts: [
       {
         ...LqtyStaking,
         functionName: "stakes",
-        args: [address ?? "0x"],
+        args: [userProxyAddress.data ?? "0x"],
       },
       {
         ...LqtyStaking,
         functionName: "totalLQTYStaked",
       },
+      {
+        ...LqtyStaking,
+        functionName: "getPendingETHGain",
+        args: [userProxyAddress.data ?? "0x"],
+      },
+      {
+        ...LqtyStaking,
+        functionName: "getPendingLUSDGain",
+        args: [userProxyAddress.data ?? "0x"],
+      },
+      {
+        ...LusdToken,
+        functionName: "balanceOf",
+        args: [userProxyAddress.data ?? "0x"],
+      },
     ],
     query: {
-      enabled: Boolean(address),
+      enabled: Boolean(address) && userProxyAddress.isSuccess && userProxyBalance.isSuccess,
       refetchInterval: DATA_REFRESH_INTERVAL,
-      select: ([deposit_, totalStaked_]): PositionStake => {
-        const totalStaked = dnum18(totalStaked_);
-        const deposit = dnum18(deposit_);
+      select: (
+        [depositResult, totalStakedResult, pendingEthGainResult, pendingLusdGainResult, lusdBalanceResult],
+      ): PositionStake | null => {
+        if (
+          depositResult.status === "failure" || totalStakedResult.status === "failure"
+          || pendingEthGainResult.status === "failure" || pendingLusdGainResult.status === "failure"
+          || lusdBalanceResult.status === "failure"
+        ) {
+          return null;
+        }
+        const deposit = dnum18(depositResult.result);
+        const totalStaked = dnum18(totalStakedResult.result);
         return {
           type: "stake",
           deposit,
           owner: address ?? "0x",
           totalStaked,
           rewards: {
-            eth: dnum18(0),
-            lusd: dnum18(0),
+            eth: dnum18(pendingEthGainResult.result + (userProxyBalance.data?.value ?? 0n)),
+            lusd: dnum18(pendingLusdGainResult.result + lusdBalanceResult.result),
           },
           share: dn.gt(totalStaked, 0) ? dn.div(deposit, totalStaked) : dnum18(0),
         };
       },
     },
-    allowFailure: false,
   });
 }
 

@@ -13,14 +13,14 @@ export const MAX_LTV_ALLOWED_RATIO = 0.916; // ratio of the max LTV allowed by t
 export const MAX_LTV_RESERVE_RATIO = 0.04; // ratio of the max LTV in non-limited mode (e.g. when updating a position), to prevent reaching the max LTV
 
 export const ETH_MAX_RESERVE = dn.from(0.1, 18); // leave 0.1 ETH when users click on "max" to deposit from their account
+
 export const ETH_GAS_COMPENSATION = dn.from(0.0375, 18); // see contracts/src/Dependencies/Constants.sol
+export const MIN_ANNUAL_INTEREST_RATE = dn.from(0.005, 18); // 0.5% see contracts/src/Dependencies/Constants.sol
+export const MAX_ANNUAL_INTEREST_RATE = dn.from(2.5, 18); // 250% see contracts/src/Dependencies/Constants.sol
 
-export const MIN_ANNUAL_INTEREST_RATE = dn.from(0.005, 18); // 0.5%
-export const MAX_ANNUAL_INTEREST_RATE = dn.from(1, 18); // 100%
-
-export const INTEREST_RATE_MIN = 0.5;
-export const INTEREST_RATE_MAX = 25;
-export const INTEREST_RATE_DEFAULT = 4;
+export const INTEREST_RATE_MIN = 0.5; // 0.5% annualized
+export const INTEREST_RATE_MAX = 25; // 25% annualized
+export const INTEREST_RATE_DEFAULT = 10;
 export const INTEREST_RATE_INCREMENT = 0.1;
 
 export const ONE_DAY_IN_SECONDS = 24n * 60n * 60n;
@@ -30,6 +30,7 @@ export const UPFRONT_INTEREST_PERIOD = 7n * ONE_DAY_IN_SECONDS;
 export const SP_YIELD_SPLIT = 72n * 10n ** 16n; // 72%
 
 export const DATA_REFRESH_INTERVAL = 30_000;
+export const PRICE_REFRESH_INTERVAL = 60_000;
 
 export const LEVERAGE_MAX_SLIPPAGE = 0.05; // 5%
 export const CLOSE_FROM_COLLATERAL_SLIPPAGE = 0.05; // 5%
@@ -42,9 +43,9 @@ export const MAX_COLLATERAL_DEPOSITS: Record<CollateralSymbol, dn.Dnum> = {
   RETH: dn.from(100_000_000n, 18),
 };
 
-// LTV factor suggestions, as ratios of the leverage factor range
+// LTV factor suggestions, as ratios of the multiply factor range
 export const LEVERAGE_FACTOR_SUGGESTIONS = [
-  norm(1.5, 1.1, 11), // 1.5x leverage with a 1.1x => 11x range
+  norm(1.5, 1.1, 11), // 1.5x multiply with a 1.1x => 11x range
   norm(2.5, 1.1, 11),
   norm(5, 1.1, 11),
 ];

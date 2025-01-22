@@ -23,9 +23,9 @@ import {
   CHAIN_RPC_URL,
   CONTRACT_BOLD_TOKEN,
   CONTRACT_LQTY_TOKEN,
-  CONTRACT_LUSD_TOKEN,
   WALLET_CONNECT_PROJECT_ID,
 } from "@/src/env";
+import { getSafeStatus } from "@/src/safe-utils";
 import { noop } from "@/src/utils";
 import { BOLD_TOKEN_SYMBOL, isCollateralSymbol, useTheme } from "@liquity2/uikit";
 import {
@@ -43,8 +43,7 @@ import {
   safeWallet,
   walletConnectWallet,
 } from "@rainbow-me/rainbowkit/wallets";
-
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { match } from "ts-pattern";
 import { erc20Abi } from "viem";
@@ -57,18 +56,14 @@ import {
   WagmiProvider,
 } from "wagmi";
 
-const queryClient = new QueryClient();
-
 export function Ethereum({ children }: { children: ReactNode }) {
   const wagmiConfig = useWagmiConfig();
   const rainbowKitProps = useRainbowKitProps();
   return (
     <WagmiProvider config={wagmiConfig}>
-      <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider {...rainbowKitProps}>
-          {children}
-        </RainbowKitProvider>
-      </QueryClientProvider>
+      <RainbowKitProvider {...rainbowKitProps}>
+        {children}
+      </RainbowKitProvider>
     </WagmiProvider>
   );
 }
@@ -79,6 +74,7 @@ export function useAccount():
     connect: () => void;
     disconnect: () => void;
     ensName: string | undefined;
+    safeStatus: Awaited<ReturnType<typeof getSafeStatus>> | null;
   }
 {
   const demoMode = useDemoMode();
@@ -86,11 +82,30 @@ export function useAccount():
   const { openConnectModal } = useConnectModal();
   const { openAccountModal } = useAccountModal();
   const ensName = useEnsName({ address: account?.address });
-  return demoMode.enabled ? demoMode.account : {
+
+  const safeStatus = useQuery({
+    queryKey: ["safeStatus", account.address],
+    enabled: Boolean(account.address),
+    queryFn: () => {
+      if (!account.address) {
+        throw new Error("No account address");
+      }
+      return getSafeStatus(account.address);
+    },
+    staleTime: Infinity,
+    refetchInterval: false,
+  });
+
+  if (demoMode.enabled) {
+    return demoMode.account;
+  }
+
+  return {
     ...account,
     connect: openConnectModal || noop,
     disconnect: account.isConnected && openAccountModal || noop,
     ensName: ensName.data ?? undefined,
+    safeStatus: safeStatus.data ?? null,
   };
 }
 
@@ -114,7 +129,6 @@ export function useBalance(
     )
     .with(BOLD_TOKEN_SYMBOL, () => CONTRACT_BOLD_TOKEN)
     .with("LQTY", () => CONTRACT_LQTY_TOKEN)
-    .with("LUSD", () => CONTRACT_LUSD_TOKEN)
     .otherwise(() => null);
 
   const tokenBalance = useReadContract({

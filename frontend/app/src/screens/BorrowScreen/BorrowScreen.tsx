@@ -26,7 +26,7 @@ import { getLiquidationRisk, getLoanDetails, getLtv } from "@/src/liquity-math";
 import { useAccount, useBalance } from "@/src/services/Ethereum";
 import { usePrice } from "@/src/services/Prices";
 import { useTransactionFlow } from "@/src/services/TransactionFlow";
-import { useTrovesCount } from "@/src/subgraph-hooks";
+import { useNextOwnerIndex } from "@/src/subgraph-hooks";
 import { isCollIndex } from "@/src/types";
 import { infoTooltipProps } from "@/src/uikit-utils";
 import { css } from "@/styled-system/css";
@@ -60,7 +60,7 @@ export function BorrowScreen() {
 
   // useParams() can return an array but not with the current
   // routing setup, so we can safely cast it to a string
-  const collSymbol = String(useParams().collateral ?? contracts.collaterals[0].symbol).toUpperCase();
+  const collSymbol = String(useParams().collateral ?? contracts.collaterals[0]?.symbol ?? "").toUpperCase();
   if (!isCollateralSymbol(collSymbol)) {
     throw new Error(`Invalid collateral symbol: ${collSymbol}`);
   }
@@ -79,6 +79,9 @@ export function BorrowScreen() {
   });
 
   const collateral = collaterals[collIndex];
+  if (!collateral) {
+    throw new Error(`Unknown collateral index: ${collIndex}`);
+  }
 
   const maxCollDeposit = MAX_COLLATERAL_DEPOSITS[collSymbol] ?? null;
 
@@ -107,15 +110,18 @@ export function BorrowScreen() {
   ] as const)));
 
   const collBalance = balances[collateral.symbol];
+  if (!collBalance) {
+    throw new Error(`Unknown collateral symbol: ${collateral.symbol}`);
+  }
 
-  const troveCount = useTrovesCount(account.address ?? null, collIndex);
+  const nextOwnerIndex = useNextOwnerIndex(account.address ?? null, collIndex);
 
   const loanDetails = getLoanDetails(
     deposit.isEmpty ? null : deposit.parsed,
     debt.isEmpty ? null : debt.parsed,
     interestRate,
     collateral.collateralRatio,
-    collPrice,
+    collPrice.data ?? null,
   );
 
   const debtSuggestions = loanDetails.maxDebt
@@ -136,10 +142,10 @@ export function BorrowScreen() {
         }
       }
 
-      const ltv = debt && loanDetails.deposit && collPrice && getLtv(
+      const ltv = debt && loanDetails.deposit && collPrice.data && getLtv(
         loanDetails.deposit,
         debt,
-        collPrice,
+        collPrice.data,
       );
 
       // don’t show if ltv > max LTV
@@ -207,15 +213,20 @@ export function BorrowScreen() {
                     icon: <TokenIcon symbol={symbol} />,
                     label: name,
                     value: account.isConnected
-                      ? fmtnum(balances[symbol].data ?? 0)
+                      ? fmtnum(balances[symbol]?.data ?? 0)
                       : "−",
                   }))}
                   menuPlacement="end"
                   menuWidth={300}
                   onSelect={(index) => {
+                    const coll = collaterals[index];
+                    if (!coll) {
+                      throw new Error(`Unknown collateral index: ${index}`);
+                    }
+
                     deposit.setValue("");
                     router.push(
-                      `/borrow/${collaterals[index].symbol.toLowerCase()}`,
+                      `/borrow/${coll.symbol.toLowerCase()}`,
                       { scroll: false },
                     );
                   }}
@@ -226,8 +237,8 @@ export function BorrowScreen() {
               placeholder="0.00"
               secondary={{
                 start: `$${
-                  deposit.parsed && collPrice
-                    ? fmtnum(dn.mul(collPrice, deposit.parsed), "2z")
+                  deposit.parsed && collPrice.data
+                    ? fmtnum(dn.mul(collPrice.data, deposit.parsed), "2z")
                     : "0.00"
                 }`,
                 end: maxAmount && dn.gt(maxAmount, 0) && (
@@ -243,9 +254,9 @@ export function BorrowScreen() {
             />
           }
           footer={{
-            start: collPrice && (
+            start: collPrice.data && (
               <Field.FooterInfoCollPrice
-                collPriceUsd={collPrice}
+                collPriceUsd={collPrice.data}
                 collName={collateral.name}
               />
             ),
@@ -386,7 +397,12 @@ export function BorrowScreen() {
             size="large"
             wide
             onClick={() => {
-              if (deposit.parsed && debt.parsed && account.address) {
+              if (
+                deposit.parsed
+                && debt.parsed
+                && account.address
+                && typeof nextOwnerIndex.data === "number"
+              ) {
                 txFlow.start({
                   flowId: "openBorrowPosition",
                   backLink: ["/borrow", "Back to editing"],
@@ -395,7 +411,7 @@ export function BorrowScreen() {
 
                   collIndex,
                   owner: account.address,
-                  ownerIndex: troveCount.data ?? 0,
+                  ownerIndex: nextOwnerIndex.data,
                   collAmount: deposit.parsed,
                   boldAmount: debt.parsed,
                   upperHint: dnum18(0),
