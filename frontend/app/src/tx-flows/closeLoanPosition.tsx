@@ -151,20 +151,23 @@ export const closeLoanPosition: FlowDeclaration<Request, Step> = {
       throw new Error("Account address is required");
     }
 
-    const { entireDebt } = await readContract(wagmiConfig, {
+    const { entireDebt: entireDebtBN } = await readContract(wagmiConfig, {
       ...coll.contracts.TroveManager,
       functionName: "getLatestTroveData",
       args: [BigInt(loan.troveId)],
     });
 
-    const isBoldApproved = request.repayWithCollateral || !dn.gt(entireDebt, [
+    const entireDebt = [entireDebtBN, 18] as dn.Dnum;
+    const boldAllowance = [
       await readContract(wagmiConfig, {
         ...contracts.BoldToken,
         functionName: "allowance",
         args: [account.address, Zapper.address],
       }) ?? 0n,
       18,
-    ]);
+    ] as dn.Dnum;
+
+    const isBoldApproved = request.repayWithCollateral || !dn.gt(entireDebt, boldAllowance);
 
     const closeStep = request.repayWithCollateral
       ? "closeLoanPositionFromCollateral" as const
