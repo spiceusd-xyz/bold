@@ -664,7 +664,7 @@ function DelegateBox({
               <Amount
                 value={delegate.boldAmount}
                 format="compact"
-                suffix=" BOLD"
+                suffix={` ${BOLD_TOKEN_SYMBOL}`}
               />
             </div>
             <div

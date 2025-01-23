@@ -138,7 +138,7 @@ export const updateBorrowPosition: FlowDeclaration<UpdateBorrowPositionRequest> 
 
   steps: {
     approveBold: {
-      name: () => "Approve BOLD",
+      name: () => `Approve ${BOLD_TOKEN_SYMBOL}`,
       Status: (props) => (
         <TransactionStatus
           {...props}
