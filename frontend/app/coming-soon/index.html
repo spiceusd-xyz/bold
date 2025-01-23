@@ -13,6 +13,7 @@
             margin: 0;
             height: 100vh;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             background-color: #000000;
@@ -24,9 +25,30 @@
             font-size: 3rem;
             font-weight: normal;
         }
+        footer {
+            margin-top: auto;
+            padding: 2.25rem;
+            text-align: center;
+            font-size: 1.2rem;
+            color: #b0b0b0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            flex-direction: row;
+        }
+        footer img {
+            width: 24px;
+            height: 24px;
+        }
     </style>
 </head>
 <body>
-    <h1>Coming Soon</h1>
+    <div style="flex: 1; display: flex; justify-content: center; align-items: center;">
+        <h1>Coming Soon</h1>
+    </div>
+    <footer>
+        <img src="/favicon-32x32.png" alt="SpiceUSD Logo"> SpiceUSD
+    </footer>
 </body>
 </html>
