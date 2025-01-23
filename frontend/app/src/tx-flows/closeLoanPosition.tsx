@@ -108,7 +108,7 @@ export const closeLoanPosition: FlowDeclaration<CloseLoanPositionRequest> = {
 
   steps: {
     approveBold: {
-      name: () => "Approve BOLD",
+      name: () => `Approve ${BOLD_TOKEN_SYMBOL}`,
       Status: (props) => (
         <TransactionStatus
           {...props}
