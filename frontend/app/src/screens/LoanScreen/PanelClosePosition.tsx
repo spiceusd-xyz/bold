@@ -24,6 +24,9 @@ export function PanelClosePosition({
 
   const contracts = getContracts();
   const collateral = contracts.collaterals[loan.collIndex];
+  if (!collateral) {
+    return null;
+  }
   const collToken = TOKENS_BY_SYMBOL[collateral.symbol];
 
   const collPriceUsd = usePrice(collToken.symbol);
@@ -36,12 +39,12 @@ export function PanelClosePosition({
   // either in BOLD or in collateral
   const amountToRepay = repayToken.symbol === BOLD_TOKEN_SYMBOL
     ? loan.borrowed
-    : collPriceUsd && dn.div(loan.borrowed, collPriceUsd);
+    : collPriceUsd.data && dn.div(loan.borrowed, collPriceUsd.data);
 
   const amountToRepayUsd = amountToRepay && (
     repayToken.symbol === BOLD_TOKEN_SYMBOL
-      ? boldPriceUsd && dn.mul(amountToRepay, boldPriceUsd)
-      : collPriceUsd && dn.mul(amountToRepay, collPriceUsd)
+      ? boldPriceUsd.data && dn.mul(amountToRepay, boldPriceUsd.data)
+      : collPriceUsd.data && dn.mul(amountToRepay, collPriceUsd.data)
   );
 
   // when repaying with collateral, subtract the amount used to repay
@@ -50,10 +53,9 @@ export function PanelClosePosition({
     : amountToRepay && dn.sub(loan.deposit, amountToRepay);
 
   const displayedCollToReclaim = useStERC20Amount(collateral.symbol, collToReclaim);
-
-  const collToReclaimUsd = displayedCollToReclaim && collPriceUsd && dn.mul(
+  const collToReclaimUsd = displayedCollToReclaim && collPriceUsd.data && dn.mul(
     displayedCollToReclaim,
-    collPriceUsd,
+    collPriceUsd.data,
   );
 
   const isOwner = Boolean(account.address && addressesEqual(account.address, loan.borrower));
@@ -81,85 +83,87 @@ export function PanelClosePosition({
     return null;
   })();
 
-  if (!collPriceUsd || !boldPriceUsd || !amountToRepay || !collToReclaim) {
+  if (!collPriceUsd.data || !boldPriceUsd.data || !amountToRepay || !collToReclaim) {
     return null;
   }
+
+  // happens in case the loan got redeemed
+  const claimOnly = dn.eq(amountToRepay, 0);
 
   const allowSubmit = error === null;
 
   return (
     <>
       <VFlex gap={48}>
-        <Field
-          label="You repay with"
-          field={
-            <div
-              className={css({
-                display: "flex",
-                alignItems: "center",
-                gap: 16,
-                justifyContent: "space-between",
-              })}
-            >
+        {!claimOnly && (
+          <Field
+            label="You repay with"
+            field={
               <div
                 className={css({
                   display: "flex",
+                  alignItems: "center",
                   gap: 16,
-                  fontSize: 28,
-                  lineHeight: 1,
+                  justifyContent: "space-between",
                 })}
               >
-                {fmtnum(amountToRepay)}
-              </div>
-              <Dropdown
-                buttonDisplay={() => ({
-                  icon: <TokenIcon symbol={repayToken.symbol} />,
-                  label: (
-                    <>
-                      {repayToken.name}
-                      <span
+                <div
+                  className={css({
+                    display: "flex",
+                    gap: 16,
+                    fontSize: 28,
+                    lineHeight: 1,
+                  })}
+                >
+                  {fmtnum(amountToRepay)}
+                </div>
+                <Dropdown
+                  buttonDisplay={() => ({
+                    icon: <TokenIcon symbol={repayToken.symbol} />,
+                    label: (
+                      <>
+                        {repayToken.name}
+                        <span
+                          className={css({
+                            color: "contentAlt",
+                            fontWeight: 400,
+                          })}
+                        >
+                          {repayToken.symbol === BOLD_TOKEN_SYMBOL ? " account" : " loan"}
+                        </span>
+                      </>
+                    ),
+                  })}
+                  items={([BOLD_TOKEN_SYMBOL, collToken.symbol] as const).map((symbol) => ({
+                    icon: <TokenIcon symbol={symbol} />,
+                    label: (
+                      <div
                         className={css({
-                          color: "contentAlt",
-                          fontWeight: 400,
+                          whiteSpace: "nowrap",
                         })}
                       >
-                        {repayToken.symbol === BOLD_TOKEN_SYMBOL ? " account" : " loan"}
-                      </span>
-                    </>
-                  ),
-                })}
-                items={([
-                  BOLD_TOKEN_SYMBOL,
-                  // collToken.symbol
-                ] as const).map((symbol) => ({
-                  icon: <TokenIcon symbol={symbol} />,
-                  label: (
-                    <div
-                      className={css({
-                        whiteSpace: "nowrap",
-                      })}
-                    >
-                      {TOKENS_BY_SYMBOL[symbol].name} {symbol === BOLD_TOKEN_SYMBOL ? "(account)" : "(loan collateral)"}
-                    </div>
-                  ),
-                  value: symbol === BOLD_TOKEN_SYMBOL ? fmtnum(boldBalance.data) : null,
-                }))}
-                menuWidth={300}
-                menuPlacement="end"
-                onSelect={setRepayDropdownIndex}
-                selected={repayDropdownIndex}
-              />
-            </div>
-          }
-          footer={{
-            start: (
-              <Field.FooterInfo
-                label={`$${fmtnum(amountToRepayUsd)}`}
-                value={null}
-              />
-            ),
-          }}
-        />
+                        {TOKENS_BY_SYMBOL[symbol].name} {symbol === BOLD_TOKEN_SYMBOL ? "(account)" : "(loan collateral)"}
+                      </div>
+                    ),
+                    value: symbol === BOLD_TOKEN_SYMBOL ? fmtnum(boldBalance.data) : null,
+                  }))}
+                  menuWidth={300}
+                  menuPlacement="end"
+                  onSelect={setRepayDropdownIndex}
+                  selected={repayDropdownIndex}
+                />
+              </div>
+            }
+            footer={{
+              start: (
+                <Field.FooterInfo
+                  label={`$${fmtnum(amountToRepayUsd)}`}
+                  value={null}
+                />
+              ),
+            }}
+          />
+        )}
         <Field
           label="You reclaim collateral"
           field={
@@ -225,7 +229,9 @@ export function PanelClosePosition({
           borderRadius: 8,
         })}
       >
-        {repayToken.symbol === BOLD_TOKEN_SYMBOL
+        {claimOnly
+          ? content.closeLoan.claimOnly
+          : repayToken.symbol === BOLD_TOKEN_SYMBOL
           ? content.closeLoan.repayWithBoldMessage
           : content.closeLoan.repayWithCollateralMessage}
       </div>
@@ -250,7 +256,9 @@ export function PanelClosePosition({
 
         <Button
           disabled={!allowSubmit}
-          label="Repay & close"
+          label={claimOnly
+            ? content.closeLoan.buttonReclaimAndClose
+            : content.closeLoan.buttonRepayAndClose}
           mode="primary"
           size="large"
           wide
@@ -266,7 +274,7 @@ export function PanelClosePosition({
                 successMessage: "The loan position has been closed successfully.",
 
                 loan: { ...loan },
-                repayWithCollateral: repayToken.symbol !== BOLD_TOKEN_SYMBOL,
+                repayWithCollateral: claimOnly ? false : repayToken.symbol !== BOLD_TOKEN_SYMBOL,
               });
             }
           }}

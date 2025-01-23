@@ -1,13 +1,13 @@
 import type { PositionLoanCommitted } from "@/src/types";
 import type { ReactNode } from "react";
 
-import { getContracts } from "@/src/contracts";
 import { formatRedemptionRisk } from "@/src/formatting";
 import { getLiquidationRisk, getLtv, getRedemptionRisk } from "@/src/liquity-math";
+import { getCollToken } from "@/src/liquity-utils";
 import { usePrice } from "@/src/services/Prices";
 import { riskLevelToStatusMode } from "@/src/uikit-utils";
 import { css } from "@/styled-system/css";
-import { HFlex, IconLeverage, StatusDot, TokenIcon, TOKENS_BY_SYMBOL } from "@liquity2/uikit";
+import { HFlex, IconLeverage, StatusDot, TokenIcon } from "@liquity2/uikit";
 import * as dn from "dnum";
 import Link from "next/link";
 import { PositionCard } from "./PositionCard";
@@ -33,21 +33,17 @@ export function PositionCardLeverage({
     statusTag?: ReactNode;
   })
 {
-  const contracts = getContracts();
-  const { symbol } = contracts.collaterals[collIndex];
-  const token = TOKENS_BY_SYMBOL[symbol];
-
-  const collateralPriceUsd = usePrice(symbol);
-
-  if (!collateralPriceUsd) {
-    return null;
+  const token = getCollToken(collIndex);
+  if (!token) {
+    throw new Error(`Collateral token not found for index ${collIndex}`);
   }
 
-  const ltv = getLtv(deposit, borrowed, collateralPriceUsd);
-  const redemptionRisk = getRedemptionRisk(interestRate);
+  const collateralPriceUsd = usePrice(token.symbol);
 
   const maxLtv = dn.from(1 / token.collateralRatio, 18);
+  const ltv = collateralPriceUsd.data && getLtv(deposit, borrowed, collateralPriceUsd.data);
   const liquidationRisk = ltv && getLiquidationRisk(ltv, maxLtv);
+  const redemptionRisk = getRedemptionRisk(interestRate);
 
   return (
     <Link
@@ -66,7 +62,7 @@ export function PositionCardLeverage({
               color: "positionContent",
             })}
           >
-            <div>Leverage loan</div>
+            <div>Multiply position</div>
             {statusTag}
           </div>,
         ]}
@@ -83,7 +79,7 @@ export function PositionCardLeverage({
           value: (
             <HFlex gap={8} alignItems="center" justifyContent="flex-start">
               {deposit ? dn.format(deposit, 2) : "−"}
-              <TokenIcon size={24} symbol={symbol} />
+              <TokenIcon size={24} symbol={token.symbol} />
             </HFlex>
           ),
           label: "Net value",
@@ -135,14 +131,16 @@ export function PositionCardLeverage({
                     fontSize: 14,
                   })}
                 >
-                  <div
-                    className={css({
-                      color: "positionContent",
-                    })}
-                  >
-                    {liquidationRisk === "low" ? "Low" : liquidationRisk === "medium" ? "Medium" : "High"}{" "}
-                    liquidation risk
-                  </div>
+                  {liquidationRisk && (
+                    <div
+                      className={css({
+                        color: "positionContent",
+                      })}
+                    >
+                      {liquidationRisk === "low" ? "Low" : liquidationRisk === "medium" ? "Medium" : "High"}{" "}
+                      liquidation risk
+                    </div>
+                  )}
                   <StatusDot
                     mode={riskLevelToStatusMode(liquidationRisk)}
                     size={8}

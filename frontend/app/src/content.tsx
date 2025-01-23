@@ -12,7 +12,7 @@ export default {
   menu: {
     dashboard: "Dashboard",
     borrow: "Borrow",
-    leverage: "Leverage",
+    multiply: "Multiply",
     earn: "Earn",
     stake: "Stake",
   },
@@ -85,7 +85,7 @@ export default {
         </>
       ),
       footerLink: {
-        href: "https://github.com/liquity/bold#bold-redemptions",
+        href: "https://docs.liquity.org/v2-faq/redemptions-and-delegation",
         label: "Learn more",
       },
     },
@@ -116,7 +116,7 @@ export default {
     ],
     learnMore: {
       text: "Learn more about redemptions",
-      href: "https://github.com/liquity/bold#bold-redemptions",
+      href: "https://docs.liquity.org/v2-faq/redemptions-and-delegation",
     },
   },
 
@@ -166,6 +166,11 @@ export default {
   },
 
   closeLoan: {
+    claimOnly: (
+      <>
+        You are reclaiming your collateral and closing the position. The deposit will be returned to your wallet.
+      </>
+    ),
     repayWithBoldMessage: (
       <>
         You are repaying your debt and closing the position. The deposit will be returned to your wallet.
@@ -177,6 +182,8 @@ export default {
         will be returned to your wallet.
       </>
     ),
+    buttonRepayAndClose: "Repay & close",
+    buttonReclaimAndClose: "Reclaim & close",
   },
 
   // Home screen
@@ -185,20 +192,20 @@ export default {
     myPositionsTitle: "My positions",
     actions: {
       borrow: {
-        title: `Borrow ${BOLD_TOKEN_SYMBOL}`,
-        description: `Set your own interest rate and borrow ${BOLD_TOKEN_SYMBOL} against ETH and staked ETH.`,
+        title: "Borrow",
+        description: `Mint ${BOLD_TOKEN_SYMBOL} against your collateral at whatever interest rate you want`,
       },
-      leverage: {
-        title: "Leverage ETH",
-        description: "Set your own interest rate and increase your exposure to ETH and staked ETH.",
+      multiply: {
+        title: "Multiply",
+        description: "Increase your exposure to ETH and its staking yield with a single click",
       },
       earn: {
         title: `Earn with ${BOLD_TOKEN_SYMBOL}`,
-        description: `Cover liquidations to earn ${BOLD_TOKEN_SYMBOL} and collateral assets.`,
+        description: `Deposit ${BOLD_TOKEN_SYMBOL} to earn protocol revenues and liquidation proceeds`,
       },
       stake: {
         title: "Stake LQTY",
-        description: "Accrue voting power by staking your LQTY without a minimum lockup period.",
+        description: "Direct protocol incentives with LQTY while earning from Liquity V1",
       },
     },
     statsBar: {
@@ -250,11 +257,11 @@ export default {
     },
   },
 
-  // Leverage screen
+  // Multiply screen
   leverageScreen: {
     headline: (tokensIcons: N) => (
       <>
-        Leverage your exposure to {tokensIcons}
+        Multiply your exposure to {tokensIcons}
       </>
     ),
     depositField: {
@@ -269,7 +276,7 @@ export default {
     action: "Next: Summary",
     infoTooltips: {
       leverageLevel: [
-        "Leverage level",
+        "Multiply level",
         <>
           Choose the amplification of your exposure. Note that a higher level means higher liquidation risk. You are
           responsible for your own assessment of what a suitable level is.
@@ -437,7 +444,7 @@ export default {
       intro: (
         <>
           Direct incentives from Liquity V2 protocol revenues towards liquidity providers for {BOLD_TOKEN_SYMBOL}. Upvote from Thursday
-          to Tuesday. Downvote all week. <Link href="https://github.com/liquity/V2-gov">Learn more</Link>
+          to Tuesday. Downvote all week. <Link href="https://docs.liquity.org/v2-faq/lqty-staking">Learn more</Link>
         </>
       ),
     },

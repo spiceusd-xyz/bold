@@ -142,7 +142,7 @@ function BorrowingRow({
             />
           </Link>
           {/* <Link
-            href={`/leverage/${symbol.toLowerCase()}`}
+            href={`/multiply/${symbol.toLowerCase()}`}
             legacyBehavior
             passHref
           >
@@ -159,7 +159,7 @@ function BorrowingRow({
                     fontSize: 14,
                   })}
                 >
-                  Leverage
+                  Multiply
                   <TokenIcon symbol={symbol} size="mini" />
                 </div>
               }

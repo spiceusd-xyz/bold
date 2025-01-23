@@ -6,6 +6,7 @@ import type { CollIndex, Token } from "@/src/types";
 import type { Address, CollateralSymbol, TokenSymbol } from "@liquity2/uikit";
 import type { ComponentProps, ReactNode } from "react";
 import type { Chain } from "wagmi/chains";
+import type { Config as WagmiConfig } from "wagmi";
 
 import { getCollateralContract, getContracts } from "@/src/contracts";
 import { ACCOUNT_BALANCES } from "@/src/demo-mode";
@@ -23,9 +24,9 @@ import {
   CHAIN_RPC_URL,
   CONTRACT_BOLD_TOKEN,
   CONTRACT_LQTY_TOKEN,
-  CONTRACT_LUSD_TOKEN,
   WALLET_CONNECT_PROJECT_ID,
 } from "@/src/env";
+import { getSafeStatus } from "@/src/safe-utils";
 import { noop } from "@/src/utils";
 import { BOLD_TOKEN_SYMBOL, isCollateralSymbol, useTheme } from "@liquity2/uikit";
 import {
@@ -43,8 +44,7 @@ import {
   safeWallet,
   walletConnectWallet,
 } from "@rainbow-me/rainbowkit/wallets";
-
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { match } from "ts-pattern";
 import { erc20Abi } from "viem";
@@ -60,18 +60,14 @@ import { CONTRACT_USDB_TOKEN } from "../constants";
 import { NrERC20 } from "../abi/NrERC20";
 import { readContract } from "@wagmi/core";
 
-const queryClient = new QueryClient();
-
 export function Ethereum({ children }: { children: ReactNode }) {
   const wagmiConfig = useWagmiConfig();
   const rainbowKitProps = useRainbowKitProps();
   return (
     <WagmiProvider config={wagmiConfig}>
-      <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider {...rainbowKitProps}>
-          {children}
-        </RainbowKitProvider>
-      </QueryClientProvider>
+      <RainbowKitProvider {...rainbowKitProps}>
+        {children}
+      </RainbowKitProvider>
     </WagmiProvider>
   );
 }
@@ -82,6 +78,7 @@ export function useAccount():
     connect: () => void;
     disconnect: () => void;
     ensName: string | undefined;
+    safeStatus: Awaited<ReturnType<typeof getSafeStatus>> | null;
   }
 {
   const demoMode = useDemoMode();
@@ -89,11 +86,30 @@ export function useAccount():
   const { openConnectModal } = useConnectModal();
   const { openAccountModal } = useAccountModal();
   const ensName = useEnsName({ address: account?.address });
-  return demoMode.enabled ? demoMode.account : {
+
+  const safeStatus = useQuery({
+    queryKey: ["safeStatus", account.address],
+    enabled: Boolean(account.address),
+    queryFn: () => {
+      if (!account.address) {
+        throw new Error("No account address");
+      }
+      return getSafeStatus(account.address);
+    },
+    staleTime: Infinity,
+    refetchInterval: false,
+  });
+
+  if (demoMode.enabled) {
+    return demoMode.account;
+  }
+
+  return {
     ...account,
     connect: openConnectModal || noop,
     disconnect: account.isConnected && openAccountModal || noop,
     ensName: ensName.data ?? undefined,
+    safeStatus: safeStatus.data ?? null,
   };
 }
 
@@ -120,7 +136,6 @@ export function useBalance(
     )
     .with(BOLD_TOKEN_SYMBOL, () => CONTRACT_BOLD_TOKEN)
     .with("LQTY", () => CONTRACT_LQTY_TOKEN)
-    .with("LUSD", () => CONTRACT_LUSD_TOKEN)
     .otherwise(() => null);
 
   const tokenBalance = useReadContract({
@@ -291,7 +306,7 @@ export function useStERC20Amount(symbol: TokenSymbol | CollIndex | null | undefi
   return dn.div(dn.mul(dn.setDecimals(nrERC20Amount, 18), stERC20PerToken), 1e18);
 }
 
-export async function getStERC20Amount(symbol: CollateralSymbol, collAmount: dn.Dnum, wagmiConfig: ReturnType<typeof useWagmiConfig>) {
+export async function getStERC20Amount(symbol: CollateralSymbol, collAmount: dn.Dnum, wagmiConfig: WagmiConfig) {
   const collateral = getContracts().collaterals.find(collateral => typeof symbol === 'number' ? collateral.collIndex === symbol : collateral.symbol === symbol)!;
   const isNrERC20Token = getIsNrERC20Token(collateral?.symbol);
 
@@ -314,7 +329,7 @@ export function getApprovalAddress (symbol: CollateralSymbol) {
     getContracts().collaterals.find(collateral => collateral.symbol === symbol)!.contracts.CollToken.address;
 }
 
-export async function getApprovalAmount (symbol: CollateralSymbol, collAmount: dn.Dnum, wagmiConfig: ReturnType<typeof useWagmiConfig>): Promise<bigint> { 
+export async function getApprovalAmount (symbol: CollateralSymbol, collAmount: dn.Dnum, wagmiConfig: WagmiConfig): Promise<bigint> { 
   const stERC20Amount = await getStERC20Amount(symbol, collAmount, wagmiConfig);
   const approvalAmount = dn.mul(stERC20Amount, 1.01);
   return approvalAmount[0];

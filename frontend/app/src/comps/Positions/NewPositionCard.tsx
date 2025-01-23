@@ -19,15 +19,15 @@ const actionAttributes = {
     path: "/borrow",
     title: "Borrow",
   },
-  // leverage: {
+  // multiply: {
   //   colors: {
   //     background: "#FFDF41",
   //     foreground: token("colors.yellow:120"),
   //     foregroundAlt: token("colors.text:black"),
   //   },
-  //   description: contentActions.leverage.description,
-  //   path: "/leverage",
-  //   title: "Leverage",
+  //   description: contentActions.multiply.description,
+  //   path: "/multiply",
+  //   title: "Multiply",
   // },
   earn: {
     colors: {

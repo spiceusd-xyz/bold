@@ -13,7 +13,10 @@ export async function graphQuery<TResult, TVariables>(
       "Content-Type": "application/json",
       Accept: "application/graphql-response+json",
     },
-    body: JSON.stringify({ query, variables }),
+    body: JSON.stringify(
+      { query, variables },
+      (_, value) => typeof value === "bigint" ? String(value) : value,
+    ),
   });
 
   if (!response.ok) {
@@ -29,18 +32,10 @@ export async function graphQuery<TResult, TVariables>(
   return result.data as TResult;
 }
 
-export const TotalDepositedQuery = graphql(`
-  query TotalDeposited {
-    collaterals {
-      collIndex
-      totalDeposited
-    }
-  }
-`);
-
-export const TrovesCountQuery = graphql(`
-  query TrovesCount($id: ID!) {
+export const BorrowerInfoQuery = graphql(`
+  query BorrowerInfo($id: ID!) {
     borrowerInfo(id: $id) {
+      nextOwnerIndexes
       troves
       trovesByCollateral
     }
@@ -154,9 +149,9 @@ export const TroveByIdQuery = graphql(`
   }
 `);
 
-export const StabilityPoolQuery = graphql(`
-  query StabilityPool($id: ID!) {
-    stabilityPool(id: $id) {
+export const StabilityPoolsQuery = graphql(`
+  query StabilityPools {
+    stabilityPools {
       id
       totalDeposited
     }
@@ -246,11 +241,61 @@ export const InterestBatchQuery = graphql(`
   }
 `);
 
-export const InterestRateBracketsQuery = graphql(`
-  query InterestRateBrackets($collId: String!) {
-    interestRateBrackets(where: { collateral: $collId }, orderBy: rate) {
+export const AllInterestRateBracketsQuery = graphql(`
+  query AllInterestRateBrackets {
+    interestRateBrackets(orderBy: rate) {
+      collateral {
+        collIndex
+      }
       rate
       totalDebt
+    }
+  }
+`);
+
+export const GovernanceInitiatives = graphql(`
+  query GovernanceInitiatives {
+    governanceInitiatives {
+      id
+    }
+  }
+`);
+
+export const GovernanceUser = graphql(`
+  query GovernanceUser($id: ID!) {
+    governanceUser(id: $id) {
+      id
+      allocatedLQTY
+      stakedLQTY
+      stakedOffset
+      allocations {
+        id
+        atEpoch
+        vetoLQTY
+        voteLQTY
+        initiative {
+          id
+        }
+      }
+    }
+  }
+`);
+
+export const GovernanceStats = graphql(`
+  query GovernanceStats {
+    governanceStats(id: "stats") {
+      id
+      totalLQTYStaked
+      totalOffset
+      totalInitiatives
+    }
+  }
+`);
+
+export const GovernanceUserAllocated = graphql(`
+  query GovernanceUserAllocations($id: ID!) {
+    governanceUser(id: $id) {
+      allocated
     }
   }
 `);

@@ -30,12 +30,22 @@ const argv = minimist(process.argv.slice(2), {
   ],
 });
 
+const ZERO_ADDRESS = "0x" + "0".repeat(40);
+
 const ZAddress = z.string().regex(/^0x[0-9a-fA-F]{40}$/);
 const ZDeploymentManifest = z.object({
   collateralRegistry: ZAddress,
   boldToken: ZAddress,
   hintHelpers: ZAddress,
   multiTroveGetter: ZAddress,
+  exchangeHelpers: ZAddress,
+
+  governance: z.object({
+    LUSDToken: ZAddress,
+    LQTYToken: ZAddress,
+    stakingV1: ZAddress,
+    governance: ZAddress,
+  }),
 
   branches: z.array(
     z.object({
@@ -46,7 +56,6 @@ const ZDeploymentManifest = z.object({
       collToken: ZAddress,
       defaultPool: ZAddress,
       gasPool: ZAddress,
-      interestRouter: ZAddress,
       leverageZapper: ZAddress,
       metadataNFT: ZAddress,
       priceFeed: ZAddress,
@@ -128,7 +137,7 @@ function deployedContractsToAppEnvVariables(manifest: DeploymentManifest) {
     NEXT_PUBLIC_CONTRACT_WETH: manifest.branches[0].collToken,
   };
 
-  const { branches, ...protocol } = manifest;
+  const { branches, governance, ...protocol } = manifest;
 
   // protocol contracts
   for (const [contractName, address] of Object.entries(protocol)) {
@@ -138,13 +147,24 @@ function deployedContractsToAppEnvVariables(manifest: DeploymentManifest) {
     }
   }
 
-  // collateral contracts
+  // branches contracts
   for (const [index, contract] of Object.entries(branches)) {
     for (const [contractName, address] of Object.entries(contract)) {
       const envVarName = contractNameToAppEnvVariable(contractName, `COLL_${index}_CONTRACT`);
       if (envVarName) {
         appEnvVariables[envVarName] = address;
       }
+    }
+  }
+
+  // governance contracts
+  for (const [contractName, address] of Object.entries(governance)) {
+    const envVarName = contractNameToAppEnvVariable(
+      contractName,
+      contractName.endsWith("Initiative") ? "INITIATIVE" : "CONTRACT",
+    );
+    if (envVarName) {
+      appEnvVariables[envVarName] = address;
     }
   }
 
@@ -163,6 +183,8 @@ function contractNameToAppEnvVariable(contractName: string, prefix: string = "")
       return `${prefix}_HINT_HELPERS`;
     case "multiTroveGetter":
       return `${prefix}_MULTI_TROVE_GETTER`;
+    case "exchangeHelpers":
+      return `${prefix}_EXCHANGE_HELPERS`;
 
     // collateral contracts
     case "activePool":
@@ -189,6 +211,16 @@ function contractNameToAppEnvVariable(contractName: string, prefix: string = "")
       return `${prefix}_TROVE_MANAGER`;
     case "troveNFT":
       return `${prefix}_TROVE_NFT`;
+
+    // governance contracts
+    case "LUSDToken":
+      return `${prefix}_LUSD_TOKEN`;
+    case "LQTYToken":
+      return `${prefix}_LQTY_TOKEN`;
+    case "stakingV1":
+      return `${prefix}_LQTY_STAKING`;
+    case "governance":
+      return `${prefix}_GOVERNANCE`;
   }
   return null;
 }
