@@ -241,7 +241,7 @@ export function Dropdown({
                 height: "100%",
                 whiteSpace: "nowrap",
                 borderWidth: "1px 1px 0 1px",
-                borderStyle: "solid",
+                borderStyle: "none",
                 borderColor: "#F5F6F8",
                 boxShadow: `
                 0 2px 2px rgba(0, 0, 0, 0.1),
