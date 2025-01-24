@@ -501,22 +501,22 @@ function LoanCard({
                         </div>
                       }
                       items={[
-                        {
-                          icon: (
-                            <div
-                              className={css({
-                                color: "accent",
-                              })}
-                            >
-                              {mode === "multiply"
-                                ? <IconBorrow size={16} />
-                                : <IconLeverage size={16} />}
-                            </div>
-                          ),
-                          label: mode === "multiply"
-                            ? "Convert to BOLD loan"
-                            : "Convert to Multiply position",
-                        },
+                        // {
+                        //   icon: (
+                        //     <div
+                        //       className={css({
+                        //         color: "accent",
+                        //       })}
+                        //     >
+                        //       {mode === "multiply"
+                        //         ? <IconBorrow size={16} />
+                        //         : <IconLeverage size={16} />}
+                        //     </div>
+                        //   ),
+                        //   label: mode === "multiply"
+                        //     ? `Convert to ${BOLD_TOKEN_SYMBOL} loan`
+                        //     : "Convert to Multiply position",
+                        // },
                         {
                           icon: (
                             <div
