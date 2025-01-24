@@ -21,14 +21,14 @@ uint256 constant COLL_GAS_COMPENSATION_DIVISOR = 200; // dividing by 200 yields 
 uint256 constant COLL_GAS_COMPENSATION_CAP = MAX_UINT256;
 
 // Minimum amount of net Bold debt a trove must have
-uint256 constant MIN_DEBT = 1000e18;
+uint256 constant MIN_DEBT = 100e18;
 
 uint256 constant MIN_ANNUAL_INTEREST_RATE = _1pct / 2; // 0.5%
-uint256 constant MAX_ANNUAL_INTEREST_RATE = _100pct;
+uint256 constant MAX_ANNUAL_INTEREST_RATE = 250 * _1pct;
 
 // Batch management params
 uint128 constant MAX_ANNUAL_BATCH_MANAGEMENT_FEE = uint128(_100pct / 10); // 10%
-uint128 constant MIN_INTEREST_RATE_CHANGE_PERIOD = 120 seconds; // prevents more than one adjustment per ~10 blocks
+uint128 constant MIN_INTEREST_RATE_CHANGE_PERIOD = 1 hours; // prevents more than one adjustment per ~10 blocks
 
 uint256 constant REDEMPTION_FEE_FLOOR = _1pct / 2; // 0.5%
 
