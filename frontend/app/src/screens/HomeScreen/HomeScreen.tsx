@@ -40,7 +40,7 @@ export function HomeScreen() {
         })}
       >
         <HomeTable
-          title={`Borrow ${BOLD_TOKEN_SYMBOL} against ETH and staked ETH`}
+          title={`Borrow ${BOLD_TOKEN_SYMBOL} against Blast native assets`}
           subtitle="You can adjust your loans, including your interest rate, at any time"
           icon={<IconBorrow />}
           columns={["Collateral", "Avg rate, p.a.", "Max LTV", null] as const}
@@ -53,7 +53,7 @@ export function HomeScreen() {
         />
         <HomeTable
           title={`Earn rewards with ${BOLD_TOKEN_SYMBOL}`}
-          subtitle={`Earn ${BOLD_TOKEN_SYMBOL} & (staked) ETH rewards by putting your ${BOLD_TOKEN_SYMBOL} in a stability pool`}
+          subtitle={`Earn ${BOLD_TOKEN_SYMBOL} & other token rewards by putting your ${BOLD_TOKEN_SYMBOL} in a stability pool`}
           icon={<IconEarn />}
           columns={["Pool", "Current APR", "Pool size", null] as const}
           rows={collSymbols.map((symbol) => (
