@@ -136,7 +136,7 @@ export function PanelClosePosition({
                   })}
                   items={([
                     BOLD_TOKEN_SYMBOL,
-                    // collToken.symbol
+                    collToken.symbol
                   ] as const).map((symbol) => ({
                     icon: <TokenIcon symbol={symbol} />,
                     label: (
