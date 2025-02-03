@@ -2,7 +2,6 @@ import type { Address, CollIndex } from "@/src/types";
 
 import { isCollIndex } from "@/src/types";
 import { vAddress, vEnvAddressAndBlock, vEnvCurrency, vEnvFlag, vEnvLink, vEnvUrlOrDefault } from "@/src/valibot-utils";
-import { COLLATERALS } from "@liquity2/uikit";
 import * as v from "valibot";
 
 const DEFAULT_COMMIT_URL = "https://github.com/liquity/bold/tree/{commit}";
@@ -10,7 +9,7 @@ const DEFAULT_VERSION_URL = "https://github.com/liquity/bold/releases/tag/%40liq
 
 export const COLL_NUM = parseInt(process.env.NEXT_PUBLIC_COLL_NUM ?? "0");
 
-export const CollateralSymbolSchema = v.union(COLLATERALS.map(c => v.literal(c.symbol)));
+export const CollateralSymbolSchema = v.string();
 
 export const EnvSchema = v.pipe(
   v.object({
