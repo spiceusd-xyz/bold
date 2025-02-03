@@ -6,7 +6,6 @@ import type { CollIndex, Token } from "@/src/types";
 import type { Address, CollateralSymbol, TokenSymbol } from "@liquity2/uikit";
 import type { ComponentProps, ReactNode } from "react";
 import type { Chain } from "wagmi/chains";
-import type { Config as WagmiConfig } from "wagmi";
 
 import { getCollateralContract, getContracts } from "@/src/contracts";
 import { ACCOUNT_BALANCES } from "@/src/demo-mode";
