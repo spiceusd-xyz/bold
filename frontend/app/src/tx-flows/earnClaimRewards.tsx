@@ -10,7 +10,6 @@ import { vPositionEarn } from "@/src/valibot-utils";
 import * as dn from "dnum";
 import * as v from "valibot";
 import { BOLD_TOKEN_SYMBOL } from "@liquity2/uikit";
-import { writeContract } from "wagmi/actions";
 import { createRequestSchema, verifyTransaction } from "./shared";
 
 const RequestSchema = createRequestSchema(
@@ -91,23 +90,23 @@ export const earnClaimRewards: FlowDeclaration<EarnClaimRewardsRequest> = {
       name: () => "Claim rewards",
       Status: TransactionStatus,
 
-      async commit({ contracts, request, wagmiConfig }) {
-        const { collIndex } = request.earnPosition;
-        const collateral = contracts.collaterals[collIndex];
+      async commit(ctx) {
+        const { collIndex } = ctx.request.earnPosition;
+        const collateral = ctx.contracts.collaterals[collIndex];
         if (!collateral) {
           throw new Error("Invalid collateral index: " + collIndex);
         }
 
         const { StabilityPool } = collateral.contracts;
-        return writeContract(wagmiConfig, {
+        return ctx.writeContract({
           ...StabilityPool,
           functionName: "withdrawFromSP",
           args: [0n, true],
         });
       },
 
-      async verify({ wagmiConfig, isSafe }, hash) {
-        await verifyTransaction(wagmiConfig, hash, isSafe);
+      async verify(ctx, hash) {
+        await verifyTransaction(ctx.wagmiConfig, hash, ctx.isSafe);
       },
     },
   },

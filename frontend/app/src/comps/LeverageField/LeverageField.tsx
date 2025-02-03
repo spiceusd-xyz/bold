@@ -90,7 +90,7 @@ export function LeverageField({
                     fontVariantNumeric: "tabular-nums",
                   })}
                 >
-                  {dn.format(debt, { digits: 2, trailingZeros: true })}
+                  {fmtnum(debt)}
                 </span>
                 {` ${BOLD_TOKEN_SYMBOL}`}
               </>
@@ -109,7 +109,7 @@ export function LeverageField({
                 color: "content",
               })}
             >
-              ${fmtnum(collPrice, "2z")}
+              {fmtnum(collPrice, { preset: "2z", prefix: "$" })}
             </span>
           </span>
         ),
@@ -229,7 +229,7 @@ export function useLeverageField({
   }, [maxLeverageFactor]);
 
   const liquidationPriceField = useInputFieldValue(
-    (value) => `$ ${dn.format(value, { digits: 2, trailingZeros: true })}`,
+    (value) => fmtnum(value, { dust: false, prefix: "$ ", preset: "2z" }),
     {
       onChange: ({ parsed: liquidationPrice, focused }) => {
         if (liquidationPrice && dn.gt(liquidationPrice, 0) && liquidationPriceField.isFocused && focused) {

@@ -385,7 +385,7 @@ function LoanCard({
     >
       {cardTransition((style, {
         mode,
-        onLeverageModeChange,
+        // onLeverageModeChange,
         loan,
         loanDetails,
         collateral,
@@ -501,22 +501,6 @@ function LoanCard({
                         </div>
                       }
                       items={[
-                        // {
-                        //   icon: (
-                        //     <div
-                        //       className={css({
-                        //         color: "accent",
-                        //       })}
-                        //     >
-                        //       {mode === "multiply"
-                        //         ? <IconBorrow size={16} />
-                        //         : <IconLeverage size={16} />}
-                        //     </div>
-                        //   ),
-                        //   label: mode === "multiply"
-                        //     ? `Convert to ${BOLD_TOKEN_SYMBOL} loan`
-                        //     : "Convert to Multiply position",
-                        // },
                         {
                           icon: (
                             <div
@@ -578,16 +562,13 @@ function LoanCard({
                       selected={0}
                       onSelect={(index) => {
                         if (index === 0) {
-                          onLeverageModeChange(mode === "multiply" ? "borrow" : "multiply");
-                        }
-                        if (index === 1) {
                           navigator.clipboard.writeText(window.location.href);
                           copyTransition.flash();
                         }
-                        if (index === 2) {
+                        if (index === 1) {
                           window.open(`${CHAIN_BLOCK_EXPLORER?.url}address/${loan.borrower}`);
                         }
-                        if (index === 3 && nftUrl) {
+                        if (index === 2 && nftUrl) {
                           window.open(nftUrl);
                         }
                       }}
@@ -686,7 +667,7 @@ function LoanCard({
                       {fmtnum(loan.deposit)} {collateral.name}
                     </GridItem>
                     <GridItem label="Interest rate">
-                      {fmtnum(loan.interestRate, 2, 100)}%
+                      {fmtnum(loan.interestRate, "pct2")}%
                     </GridItem>
                     <GridItem label="Redemption risk">
                       <HFlex gap={8} alignItems="center" justifyContent="flex-start">
@@ -751,11 +732,11 @@ function LoanCard({
                       )}
                     <GridItem label="Liq. price" title="Liquidation price">
                       <Value negative={ltv && dn.gt(ltv, maxLtv)}>
-                        ${fmtnum(loanDetails.liquidationPrice)}
+                        {fmtnum(loanDetails.liquidationPrice, { preset: "2z", prefix: "$" })}
                       </Value>
                     </GridItem>
                     <GridItem label="Interest rate">
-                      {fmtnum(loan.interestRate, 2, 100)}%
+                      {fmtnum(loan.interestRate, "pct2")}%
                       {loan.batchManager && (
                         <div
                           title={`Interest rate delegate: ${loan.batchManager}`}
@@ -791,7 +772,7 @@ function LoanCard({
                             : "var(--status-negative)",
                         }}
                       >
-                        {fmtnum(ltv, "2z", 100)}%
+                        {fmtnum(ltv, "pct2z")}%
                       </div>
                     </GridItem>
                     <GridItem label="Liquidation risk">

@@ -144,9 +144,11 @@ export function PanelClosePosition({
                           whiteSpace: "nowrap",
                         })}
                       >
-                        {TOKENS_BY_SYMBOL[symbol].name} {symbol === BOLD_TOKEN_SYMBOL ? "(account)" : "(loan collateral)"}
+                        {TOKENS_BY_SYMBOL[symbol].name} {symbol === BOLD_TOKEN_SYMBOL ? "(account)" : "(collateral)"}
                       </div>
                     ),
+                    disabled: symbol !== BOLD_TOKEN_SYMBOL,
+                    disabledReason: symbol !== BOLD_TOKEN_SYMBOL ? "Coming soon" : undefined,
                     value: symbol === BOLD_TOKEN_SYMBOL ? fmtnum(boldBalance.data) : null,
                   }))}
                   menuWidth={300}
@@ -159,7 +161,7 @@ export function PanelClosePosition({
             footer={{
               start: (
                 <Field.FooterInfo
-                  label={`$${fmtnum(amountToRepayUsd)}`}
+                  label={fmtnum(amountToRepayUsd, { preset: "2z", prefix: "$" })}
                   value={null}
                 />
               ),
@@ -210,7 +212,7 @@ export function PanelClosePosition({
           footer={{
             start: (
               <Field.FooterInfo
-                label={`$${fmtnum(collToReclaimUsd)}`}
+                label={fmtnum(collToReclaimUsd, { preset: "2z", prefix: "$" })}
                 value={null}
               />
             ),

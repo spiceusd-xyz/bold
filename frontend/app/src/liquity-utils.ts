@@ -1,19 +1,28 @@
+import type { Contracts } from "@/src/contracts";
 import type { StabilityPoolDepositQuery } from "@/src/graphql/graphql";
-import type { CollIndex, Dnum, PositionEarn, PositionStake, PrefixedTroveId, TroveId } from "@/src/types";
+import type {
+  CollIndex,
+  Dnum,
+  PositionEarn,
+  PositionLoanCommitted,
+  PositionStake,
+  PrefixedTroveId,
+  TroveId,
+} from "@/src/types";
 import type { Address, CollateralSymbol, CollateralToken } from "@liquity2/uikit";
+import type { UseQueryResult } from "@tanstack/react-query";
+import type { Config as WagmiConfig } from "wagmi";
 
 import { DATA_REFRESH_INTERVAL, INTEREST_RATE_INCREMENT, INTEREST_RATE_MAX, INTEREST_RATE_MIN } from "@/src/constants";
 import { getCollateralContract, getContracts, getProtocolContract } from "@/src/contracts";
-import { dnum18 } from "@/src/dnum-utils";
-import { CHAIN_BLOCK_EXPLORER } from "@/src/env";
+import { dnum18, dnumOrNull, jsonStringifyWithDnum } from "@/src/dnum-utils";
+import { CHAIN_BLOCK_EXPLORER, LIQUITY_STATS_URL } from "@/src/env";
+import { getCollGainFromSnapshots, useContinuousBoldGains } from "@/src/liquity-stability-pool";
 import {
-  calculateStabilityPoolApr,
-  getCollGainFromSnapshots,
-  useContinuousBoldGains,
-  useSpYieldGainParameters,
-} from "@/src/liquity-stability-pool";
-import {
+  useGovernanceStats,
+  useGovernanceUser,
   useInterestRateBrackets,
+  useLoanById,
   useStabilityPool,
   useStabilityPoolDeposit,
   useStabilityPoolEpochScale,
@@ -23,8 +32,10 @@ import { COLLATERALS, isAddress } from "@liquity2/uikit";
 import { useQuery } from "@tanstack/react-query";
 import * as dn from "dnum";
 import { useMemo } from "react";
+import * as v from "valibot";
 import { encodeAbiParameters, keccak256, parseAbiParameters } from "viem";
 import { useBalance, useReadContract, useReadContracts } from "wagmi";
+import { readContract } from "wagmi/actions";
 
 export function shortenTroveId(troveId: TroveId, chars = 8) {
   return troveId.length < chars * 2 + 2
@@ -83,12 +94,15 @@ export function getCollIndexFromSymbol(symbol: CollateralSymbol | null): CollInd
 export function useEarnPool(collIndex: null | CollIndex) {
   const collateral = getCollToken(collIndex);
   const pool = useStabilityPool(collIndex ?? undefined);
-  const { data: spYieldGainParams } = useSpYieldGainParameters(collateral?.symbol ?? null);
-  const apr = spYieldGainParams && calculateStabilityPoolApr(spYieldGainParams);
+  const stats = useLiquityStats();
+
+  const branchStats = collateral && stats.data?.branch[collateral?.symbol];
+
   return {
     ...pool,
     data: {
-      apr: apr ?? null,
+      apr: dnumOrNull(branchStats?.spApyAvg1d, 18),
+      apr7d: dnumOrNull(branchStats?.spApyAvg7d, 18),
       collateral,
       totalDeposited: pool.data?.totalDeposited ?? null,
     },
@@ -179,7 +193,31 @@ function earnPositionFromGraph(
   };
 }
 
+export function useAccountVotingPower(account: Address | null, lqtyDiff: bigint = 0n) {
+  const govUser = useGovernanceUser(account);
+  const govStats = useGovernanceStats();
+
+  return useMemo(() => {
+    if (!govStats.data || !govUser.data) {
+      return null;
+    }
+
+    const t = BigInt(Math.floor(Date.now() / 1000));
+
+    const { totalLQTYStaked, totalOffset } = govStats.data;
+    const totalVp = (BigInt(totalLQTYStaked) + lqtyDiff) * t - BigInt(totalOffset);
+
+    const { stakedLQTY, stakedOffset } = govUser.data;
+    const userVp = (BigInt(stakedLQTY) + lqtyDiff) * t - BigInt(stakedOffset);
+
+    // pctShare(t) = userVotingPower(t) / totalVotingPower(t)
+    return dn.div([userVp, 18], [totalVp, 18]);
+  }, [govUser.data, govStats.data, lqtyDiff]);
+}
+
 export function useStakePosition(address: null | Address) {
+  const votingPower = useAccountVotingPower(address);
+
   const LqtyStaking = getProtocolContract("LqtyStaking");
   const LusdToken = getProtocolContract("LusdToken");
   const Governance = getProtocolContract("Governance");
@@ -196,7 +234,7 @@ export function useStakePosition(address: null | Address) {
     query: { enabled: Boolean(address) && userProxyAddress.isSuccess },
   });
 
-  return useReadContracts({
+  const stakePosition = useReadContracts({
     contracts: [
       {
         ...LqtyStaking,
@@ -226,9 +264,13 @@ export function useStakePosition(address: null | Address) {
     query: {
       enabled: Boolean(address) && userProxyAddress.isSuccess && userProxyBalance.isSuccess,
       refetchInterval: DATA_REFRESH_INTERVAL,
-      select: (
-        [depositResult, totalStakedResult, pendingEthGainResult, pendingLusdGainResult, lusdBalanceResult],
-      ): PositionStake | null => {
+      select: ([
+        depositResult,
+        totalStakedResult,
+        pendingEthGainResult,
+        pendingLusdGainResult,
+        lusdBalanceResult,
+      ]): PositionStake | null => {
         if (
           depositResult.status === "failure" || totalStakedResult.status === "failure"
           || pendingEthGainResult.status === "failure" || pendingLusdGainResult.status === "failure"
@@ -247,11 +289,15 @@ export function useStakePosition(address: null | Address) {
             eth: dnum18(pendingEthGainResult.result + (userProxyBalance.data?.value ?? 0n)),
             lusd: dnum18(pendingLusdGainResult.result + lusdBalanceResult.result),
           },
-          share: dn.gt(totalStaked, 0) ? dn.div(deposit, totalStaked) : dnum18(0),
+          share: dnum18(0),
         };
       },
     },
   });
+
+  return stakePosition.data && votingPower
+    ? { ...stakePosition, data: { ...stakePosition.data, share: votingPower } }
+    : stakePosition;
 }
 
 export function useTroveNftUrl(collIndex: null | CollIndex, troveId: null | TroveId) {
@@ -291,38 +337,6 @@ export function useAverageInterestRate(collIndex: null | CollIndex) {
   };
 }
 
-const EMPTY_TROVE_CHANGE = {
-  appliedRedistBoldDebtGain: 0n,
-  appliedRedistCollGain: 0n,
-  collIncrease: 0n,
-  collDecrease: 0n,
-  debtIncrease: 0n,
-  debtDecrease: 0n,
-  newWeightedRecordedDebt: 0n,
-  oldWeightedRecordedDebt: 0n,
-  upfrontFee: 0n,
-  batchAccruedManagementFee: 0n,
-  newWeightedRecordedBatchManagementFee: 0n,
-  oldWeightedRecordedBatchManagementFee: 0n,
-} as const;
-
-export function useAverageInterestRateFromActivePool(collIndex: null | CollIndex) {
-  const ActivePool = getCollateralContract(collIndex, "ActivePool");
-  const result = useReadContract(
-    !ActivePool ? {} : {
-      address: ActivePool.address,
-      abi: ActivePool.abi,
-      functionName: "getNewApproxAvgInterestRateFromTroveChange",
-      args: [EMPTY_TROVE_CHANGE],
-      query: {
-        enabled: ActivePool !== null,
-        refetchInterval: DATA_REFRESH_INTERVAL,
-      },
-    },
-  );
-  return result;
-}
-
 export function useInterestRateChartData(collIndex: null | CollIndex) {
   const brackets = useInterestRateBrackets(collIndex);
 
@@ -330,8 +344,7 @@ export function useInterestRateChartData(collIndex: null | CollIndex) {
     queryKey: [
       "useInterestRateChartData",
       collIndex,
-      brackets.status,
-      brackets.dataUpdatedAt,
+      jsonStringifyWithDnum(brackets.data),
     ],
     queryFn: () => {
       if (!brackets.isSuccess) {
@@ -451,4 +464,182 @@ export function usePredictAdjustInterestRateUpfrontFee(
       select: dnum18,
     },
   });
+}
+
+// from https://github.com/liquity/bold/blob/204a3dec54a0e8689120ca48faf4ece5cf8ccd22/README.md#example-opentrove-transaction-with-hints
+export async function getTroveOperationHints({
+  wagmiConfig,
+  contracts,
+  collIndex,
+  interestRate,
+}: {
+  wagmiConfig: WagmiConfig;
+  contracts: Contracts;
+  collIndex: number;
+  interestRate: bigint;
+}): Promise<{
+  upperHint: bigint;
+  lowerHint: bigint;
+}> {
+  const collateral = contracts.collaterals[collIndex];
+  if (!collateral) {
+    throw new Error(`Invalid collateral index: ${collIndex}`);
+  }
+
+  const numTroves = await readContract(wagmiConfig, {
+    ...collateral.contracts.SortedTroves,
+    functionName: "getSize",
+  });
+
+  const [approxHint] = await readContract(wagmiConfig, {
+    ...contracts.HintHelpers,
+    functionName: "getApproxHint",
+    args: [
+      BigInt(collIndex),
+      interestRate,
+      // (10 * sqrt(troves)) gives a hint close to the right position
+      10n * BigInt(Math.ceil(Math.sqrt(Number(numTroves)))),
+      42n, // random seed
+    ],
+  });
+
+  const [upperHint, lowerHint] = await readContract(wagmiConfig, {
+    ...collateral.contracts.SortedTroves,
+    functionName: "findInsertPosition",
+    args: [
+      interestRate,
+      approxHint,
+      approxHint,
+    ],
+  });
+
+  return { upperHint, lowerHint };
+}
+
+const StatsSchema = v.pipe(
+  v.object({
+    total_bold_supply: v.string(),
+    total_debt_pending: v.string(),
+    total_coll_value: v.string(),
+    total_sp_deposits: v.string(),
+    total_value_locked: v.string(),
+    max_sp_apy: v.string(),
+    branch: v.record(
+      v.string(),
+      v.object({
+        coll_active: v.string(),
+        coll_default: v.string(),
+        coll_price: v.string(),
+        sp_deposits: v.string(),
+        interest_accrual_1y: v.string(),
+        interest_pending: v.string(),
+        batch_management_fees_pending: v.string(),
+        debt_pending: v.string(),
+        coll_value: v.string(),
+        sp_apy: v.string(),
+        sp_apy_avg_1d: v.optional(v.string()),
+        sp_apy_avg_7d: v.optional(v.string()),
+        value_locked: v.string(),
+      }),
+    ),
+  }),
+  v.transform((value) => ({
+    totalBoldSupply: dnumOrNull(value.total_bold_supply, 18),
+    totalDebtPending: dnumOrNull(value.total_debt_pending, 18),
+    totalCollValue: dnumOrNull(value.total_coll_value, 18),
+    totalSpDeposits: dnumOrNull(value.total_sp_deposits, 18),
+    totalValueLocked: dnumOrNull(value.total_value_locked, 18),
+    maxSpApy: dnumOrNull(value.max_sp_apy, 18),
+    branch: Object.fromEntries(
+      Object.entries(value.branch).map(([symbol, branch]) => {
+        symbol = symbol.toUpperCase();
+        if (symbol === "WETH") symbol = "ETH";
+        return [symbol, {
+          collActive: dnumOrNull(branch.coll_active, 18),
+          collDefault: dnumOrNull(branch.coll_default, 18),
+          collPrice: dnumOrNull(branch.coll_price, 18),
+          spDeposits: dnumOrNull(branch.sp_deposits, 18),
+          interestAccrual1y: dnumOrNull(branch.interest_accrual_1y, 18),
+          interestPending: dnumOrNull(branch.interest_pending, 18),
+          batchManagementFeesPending: dnumOrNull(branch.batch_management_fees_pending, 18),
+          debtPending: dnumOrNull(branch.debt_pending, 18),
+          collValue: dnumOrNull(branch.coll_value, 18),
+          spApy: dnumOrNull(branch.sp_apy, 18),
+          spApyAvg1d: dnumOrNull(branch.sp_apy_avg_1d, 18),
+          spApyAvg7d: dnumOrNull(branch.sp_apy_avg_7d, 18),
+          valueLocked: dnumOrNull(branch.value_locked, 18),
+        }];
+      }),
+    ),
+  })),
+);
+
+export function useLiquityStats() {
+  return useQuery({
+    queryKey: ["liquity-stats"],
+    queryFn: async () => {
+      if (!LIQUITY_STATS_URL) {
+        throw new Error("LIQUITY_STATS_URL is not defined");
+      }
+      const response = await fetch(LIQUITY_STATS_URL);
+      return v.parse(StatsSchema, await response.json());
+    },
+    enabled: Boolean(LIQUITY_STATS_URL),
+  });
+}
+
+export function useLatestTroveData(collIndex: CollIndex, troveId: TroveId) {
+  const TroveManager = getCollateralContract(collIndex, "TroveManager");
+  if (!TroveManager) {
+    throw new Error(`Invalid collateral index: ${collIndex}`);
+  }
+  return useReadContract({
+    ...TroveManager,
+    functionName: "getLatestTroveData",
+    args: [BigInt(troveId)],
+    query: {
+      refetchInterval: DATA_REFRESH_INTERVAL,
+    },
+  });
+}
+
+export function useLoanLiveDebt(collIndex: CollIndex, troveId: TroveId) {
+  const latestTroveData = useLatestTroveData(collIndex, troveId);
+  return {
+    ...latestTroveData,
+    data: latestTroveData.data?.entireDebt ?? null,
+  };
+}
+
+export function useLoan(collIndex: CollIndex, troveId: TroveId): UseQueryResult<PositionLoanCommitted | null> {
+  const liveDebt = useLoanLiveDebt(collIndex, troveId);
+  const loan = useLoanById(getPrefixedTroveId(collIndex, troveId));
+
+  if (liveDebt.status === "pending" || loan.status === "pending") {
+    return {
+      ...loan,
+      data: undefined,
+      error: null,
+      isError: false,
+      isFetching: true,
+      isLoading: true,
+      isLoadingError: false,
+      isPending: true,
+      isRefetchError: false,
+      isSuccess: false,
+      status: "pending",
+    };
+  }
+
+  if (!loan.data) {
+    return loan;
+  }
+
+  return {
+    ...loan,
+    data: {
+      ...loan.data,
+      borrowed: liveDebt.data ? dnum18(liveDebt.data) : loan.data.borrowed,
+    },
+  };
 }
