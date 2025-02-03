@@ -59,7 +59,7 @@ import {
 } from "wagmi";
 import { CONTRACT_USDB_TOKEN } from "../constants";
 import { NrERC20 } from "../abi/NrERC20";
-import { readContract } from "@wagmi/core";
+import { FlowParams } from "./TransactionFlow";
 
 export function Ethereum({ children }: { children: ReactNode }) {
   const wagmiConfig = useWagmiConfig();
@@ -308,7 +308,7 @@ export function useStERC20Amount(symbol: TokenSymbol | CollIndex | null | undefi
   return dn.div(dn.mul(dn.setDecimals(nrERC20Amount, 18), stERC20PerToken), 1e18);
 }
 
-export async function getStERC20Amount(symbol: CollateralSymbol, collAmount: dn.Dnum, wagmiConfig: WagmiConfig) {
+export async function getStERC20Amount(symbol: CollateralSymbol, collAmount: dn.Dnum, ctx: FlowParams) {
   const collateral = getContracts().collaterals.find(collateral => typeof symbol === 'number' ? collateral.collIndex === symbol : collateral.symbol === symbol)!;
   const isNrERC20Token = getIsNrERC20Token(collateral?.symbol);
 
@@ -316,7 +316,7 @@ export async function getStERC20Amount(symbol: CollateralSymbol, collAmount: dn.
     return collAmount;
   }
 
-  const stERC20PerToken = await readContract(wagmiConfig, {
+  const stERC20PerToken = await ctx.readContract({
     abi: NrERC20,
     address: getCollateralContract(symbol, 'CollToken')?.address ?? '0x',
     functionName: 'stERC20PerToken',
@@ -331,8 +331,8 @@ export function getApprovalAddress (symbol: CollateralSymbol) {
     getContracts().collaterals.find(collateral => collateral.symbol === symbol)!.contracts.CollToken.address;
 }
 
-export async function getApprovalAmount (symbol: CollateralSymbol, collAmount: dn.Dnum, wagmiConfig: WagmiConfig): Promise<bigint> { 
-  const stERC20Amount = await getStERC20Amount(symbol, collAmount, wagmiConfig);
+export async function getApprovalAmount (symbol: CollateralSymbol, collAmount: dn.Dnum, ctx: FlowParams): Promise<bigint> { 
+  const stERC20Amount = await getStERC20Amount(symbol, collAmount, ctx);
   const approvalAmount = dn.mul(stERC20Amount, 1.01);
   return approvalAmount[0];
 }
