@@ -7,7 +7,7 @@ import { useGovernanceInitiatives } from "@/src/subgraph-hooks";
 import { vAddress } from "@/src/valibot-utils";
 import { useQuery } from "@tanstack/react-query";
 import * as v from "valibot";
-import { useConfig as useWagmiConfig, useReadContract, useReadContracts } from "wagmi";
+import { useConfig as useWagmiConfig, useReadContracts } from "wagmi";
 import { readContract, readContracts } from "wagmi/actions";
 
 export type InitiativeStatus =
@@ -67,7 +67,7 @@ export function useGovernanceState() {
         const epochStart = epochStart_.result ?? 0n;
         const epochDuration = GOVERNANCE_EPOCH_DURATION.result ?? 0n;
         const epochVotingCutoff = GOVERNANCE_EPOCH_VOTING_CUTOFF.result ?? 0n;
-        const cutoffStart = (epochStart + epochDuration) - epochVotingCutoff;
+        const cutoffStart = epochStart + epochVotingCutoff;
 
         const period: "cutoff" | "voting" = (secondsWithinEpoch.result ?? 0n) > epochVotingCutoff
           ? "cutoff"
@@ -122,25 +122,6 @@ export function useInitiativeState(initiativeAddress: Address | null) {
       },
     },
   });
-}
-
-export function useUserStates(account: Address | null) {
-  const Governance = getProtocolContract("Governance");
-  const userStates = useReadContract({
-    ...Governance,
-    functionName: "userStates",
-    args: [account ?? "0x"],
-    query: {
-      enabled: account !== null,
-      select: (userStates) => ({
-        allocatedLQTY: userStates[2],
-        allocatedOffset: userStates[3],
-        unallocatedLQTY: userStates[0],
-        unallocatedOffset: userStates[1],
-      }),
-    },
-  });
-  return userStates;
 }
 
 export async function getUserStates(
@@ -246,78 +227,9 @@ export function useKnownInitiatives() {
       if (KNOWN_INITIATIVES_URL === undefined) {
         throw new Error("KNOWN_INITIATIVES_URL is not defined");
       }
-      const response = await fetch(KNOWN_INITIATIVES_URL, {
-        headers: { "Content-Type": "application/json" },
-      });
+      const response = await fetch(KNOWN_INITIATIVES_URL);
       return v.parse(KnownInitiativesSchema, await response.json());
     },
     enabled: KNOWN_INITIATIVES_URL !== undefined,
   });
 }
-
-// const INITIATIVES_STATIC: Initiative[] = [
-//   {
-//     address: "0x0000000000000000000000000000000000000001",
-//     name: "WETH-BOLD 0.3%",
-//     protocol: "Uniswap V4",
-//     tvl: dn.from(2_420_000, 18),
-//     pairVolume: dn.from(1_420_000, 18),
-//     votesDistribution: dn.from(0.35, 18),
-//   },
-//   {
-//     address: "0x0000000000000000000000000000000000000002",
-//     name: "WETH-BOLD 0.3%",
-//     protocol: "Uniswap V4",
-//     tvl: dn.from(2_420_000, 18),
-//     pairVolume: dn.from(1_420_000, 18),
-//     votesDistribution: dn.from(0.20, 18),
-//   },
-//   {
-//     address: "0x0000000000000000000000000000000000000003",
-//     name: "crvUSD-BOLD 0.01%",
-//     protocol: "Curve V2",
-//     tvl: dn.from(2_420_000, 18),
-//     pairVolume: dn.from(1_420_000, 18),
-//     votesDistribution: dn.from(0.15, 18),
-//   },
-//   {
-//     address: "0x0000000000000000000000000000000000000004",
-//     name: "3pool-BOLD 0.01%",
-//     protocol: "Curve V2",
-//     tvl: dn.from(2_420_000, 18),
-//     pairVolume: dn.from(1_420_000, 18),
-//     votesDistribution: dn.from(0.10, 18),
-//   },
-//   {
-//     address: "0x0000000000000000000000000000000000000005",
-//     name: "3pool-BOLD 0.01%",
-//     protocol: "Curve V2",
-//     tvl: dn.from(2_420_000, 18),
-//     pairVolume: dn.from(1_420_000, 18),
-//     votesDistribution: dn.from(0.10, 18),
-//   },
-//   {
-//     address: "0x0000000000000000000000000000000000000006",
-//     name: "3pool-BOLD 0.01%",
-//     protocol: "Curve V2",
-//     tvl: dn.from(2_420_000, 18),
-//     pairVolume: dn.from(1_420_000, 18),
-//     votesDistribution: dn.from(0.05, 18),
-//   },
-//   {
-//     address: "0x0000000000000000000000000000000000000007",
-//     name: "DeFi Collective: BOLD incentives on Euler",
-//     protocol: "0x5305...1418",
-//     tvl: dn.from(0, 18),
-//     pairVolume: dn.from(0, 18),
-//     votesDistribution: dn.from(0.025, 18),
-//   },
-//   {
-//     address: "0x0000000000000000000000000000000000000008",
-//     name: "DeFi Collective: BOLD-USDC on Balancer",
-//     protocol: "0x7179...9f8f",
-//     tvl: dn.from(0, 18),
-//     pairVolume: dn.from(0, 18),
-//     votesDistribution: dn.from(0, 18),
-//   },
-// ];

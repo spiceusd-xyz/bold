@@ -291,7 +291,7 @@ export function BorrowScreen() {
               secondary={{
                 start: `$${
                   debt.parsed
-                    ? fmtnum(debt.parsed, "2z")
+                    ? fmtnum(debt.parsed)
                     : "0.00"
                 }`,
                 end: debtSuggestions && (
@@ -301,7 +301,11 @@ export function BorrowScreen() {
                         s.debt && s.risk && (
                           <PillButton
                             key={dn.toString(s.debt)}
-                            label={`$${fmtnum(s.debt, { compact: true, digits: 0 })}`}
+                            label={fmtnum(s.debt, {
+                              compact: true,
+                              digits: 0,
+                              prefix: "$",
+                            })}
                             onClick={() => {
                               if (s.debt) {
                                 debt.setValue(dn.toString(s.debt, 0));
@@ -374,7 +378,7 @@ export function BorrowScreen() {
                 })}
               >
                 <IconSuggestion size={16} />
-                <>The interest rate can be adjusted</>
+                <>You can adjust this rate at any time</>
                 <InfoTooltip {...infoTooltipProps(content.generalInfotooltips.interestRateAdjustment)} />
               </span>
             ),
@@ -417,8 +421,6 @@ export function BorrowScreen() {
                   ownerIndex: nextOwnerIndex.data,
                   collAmount: normalizedDeposit,
                   boldAmount: debt.parsed,
-                  upperHint: dnum18(0),
-                  lowerHint: dnum18(0),
                   annualInterestRate: interestRate,
                   maxUpfrontFee: dnum18(maxUint256),
                   interestRateDelegate: interestRateMode === "manual" || !interestRateDelegate ? null : [

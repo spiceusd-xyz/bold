@@ -86,7 +86,7 @@ export function TopBar() {
             })}
           >
             {content.appName}
-            {DEPLOYMENT_FLAVOR !== "" && (
+            {DEPLOYMENT_FLAVOR && (
               <div
                 className={css({
                   display: "flex",

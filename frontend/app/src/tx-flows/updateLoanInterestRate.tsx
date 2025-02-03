@@ -17,7 +17,6 @@ import * as dn from "dnum";
 import { match, P } from "ts-pattern";
 import * as v from "valibot";
 import { maxUint256 } from "viem";
-import { readContract, writeContract } from "wagmi/actions";
 import { createRequestSchema, verifyTroveUpdate } from "./shared";
 
 const RequestSchema = createRequestSchema(
@@ -86,7 +85,11 @@ export const updateLoanInterestRate: FlowDeclaration<UpdateLoanInterestRateReque
           value={[
             <AccountButton key="start" address={loan.batchManager} />,
             <div key="end">
-              {fmtnum(loan.interestRate, "full", 100)}% (~{fmtnum(yearlyBoldInterest, 4)} {BOLD_TOKEN_SYMBOL} per year)
+              {fmtnum(loan.interestRate, "pctfull")}% ({fmtnum(yearlyBoldInterest, {
+                digits: 4,
+                dust: false,
+                prefix: "~",
+              })} {BOLD_TOKEN_SYMBOL} per year)
             </div>,
           ]}
         />
@@ -97,13 +100,17 @@ export const updateLoanInterestRate: FlowDeclaration<UpdateLoanInterestRateReque
             label="New interest rate"
             value={[
               <div key="start">
-                {fmtnum(loan.interestRate, "full", 100)}%
+                {fmtnum(loan.interestRate, "pctfull")}%
               </div>,
               <div
                 key="end"
                 title={`${fmtnum(yearlyBoldInterest, "full")} ${BOLD_TOKEN_SYMBOL} per year`}
               >
-                ~{fmtnum(yearlyBoldInterest, 4)} {BOLD_TOKEN_SYMBOL} per year
+                {fmtnum(yearlyBoldInterest, {
+                  digits: 4,
+                  dust: false,
+                  prefix: "~",
+                })} {BOLD_TOKEN_SYMBOL} per year
               </div>,
             ]}
           />
@@ -125,9 +132,13 @@ export const updateLoanInterestRate: FlowDeclaration<UpdateLoanInterestRateReque
                     textDecoration: "line-through",
                   })}
                 >
-                  {fmtnum(prevLoan.interestRate, "full", 100)}% (~{fmtnum(
+                  {fmtnum(prevLoan.interestRate, "pctfull")}% ({fmtnum(
                     dn.mul(prevLoan.borrowed, prevLoan.interestRate),
-                    4,
+                    {
+                      digits: 4,
+                      dust: false,
+                      prefix: "~",
+                    },
                   )} {BOLD_TOKEN_SYMBOL} per year)
                 </div>,
               ]}
@@ -146,10 +157,12 @@ export const updateLoanInterestRate: FlowDeclaration<UpdateLoanInterestRateReque
                   <InfoTooltip
                     content={{
                       heading: null,
-                      body: `
-                        A fee equal to 7 days of average interest applies when modifying rates less than 7 days after the
-                        last adjustment. This prevents rate manipulation and ensures fair redemption distribution.
-                      `,
+                      body: (
+                        <>
+                          This fee is charged when you change the interest rate within less than 7 days since the last
+                          adjustment of your loan. You can thus adjust your interest rate for free once every 7 days.
+                        </>
+                      ),
                       footerLink: {
                         href: "https://docs.liquity.org/v2-faq/borrowing-and-liquidations#can-i-adjust-the-rate",
                         label: "Learn more",
@@ -177,17 +190,17 @@ export const updateLoanInterestRate: FlowDeclaration<UpdateLoanInterestRateReque
       name: () => "Update interest rate",
       Status: TransactionStatus,
 
-      async commit({ contracts, request, wagmiConfig }) {
-        const { loan } = request;
+      async commit(ctx) {
+        const { loan } = ctx.request;
 
-        const collateral = contracts.collaterals[loan.collIndex];
+        const collateral = ctx.contracts.collaterals[loan.collIndex];
         if (!collateral) {
           throw new Error("Invalid collateral index: " + loan.collIndex);
         }
 
         const { BorrowerOperations } = collateral.contracts;
 
-        return writeContract(wagmiConfig, {
+        return ctx.writeContract({
           ...BorrowerOperations,
           functionName: "adjustTroveInterestRate",
           args: [
@@ -200,8 +213,8 @@ export const updateLoanInterestRate: FlowDeclaration<UpdateLoanInterestRateReque
         });
       },
 
-      async verify({ request, wagmiConfig }, hash) {
-        await verifyTroveUpdate(wagmiConfig, hash, request.loan);
+      async verify(ctx, hash) {
+        await verifyTroveUpdate(ctx.wagmiConfig, hash, ctx.request.loan);
       },
     },
 
@@ -209,9 +222,9 @@ export const updateLoanInterestRate: FlowDeclaration<UpdateLoanInterestRateReque
       name: () => "Set interest rate delegate",
       Status: TransactionStatus,
 
-      async commit({ contracts, request, wagmiConfig }) {
-        const { loan } = request;
-        const collateral = contracts.collaterals[loan.collIndex];
+      async commit(ctx) {
+        const { loan } = ctx.request;
+        const collateral = ctx.contracts.collaterals[loan.collIndex];
         if (!collateral) {
           throw new Error("Invalid collateral index: " + loan.collIndex);
         }
@@ -222,7 +235,7 @@ export const updateLoanInterestRate: FlowDeclaration<UpdateLoanInterestRateReque
           throw new Error("No batch manager provided");
         }
 
-        return writeContract(wagmiConfig, {
+        return ctx.writeContract({
           ...BorrowerOperations,
           functionName: "setInterestBatchManager",
           args: [
@@ -235,8 +248,8 @@ export const updateLoanInterestRate: FlowDeclaration<UpdateLoanInterestRateReque
         });
       },
 
-      async verify({ request, wagmiConfig }, hash) {
-        await verifyTroveUpdate(wagmiConfig, hash, request.loan);
+      async verify(ctx, hash) {
+        await verifyTroveUpdate(ctx.wagmiConfig, hash, ctx.request.loan);
       },
     },
 
@@ -244,16 +257,16 @@ export const updateLoanInterestRate: FlowDeclaration<UpdateLoanInterestRateReque
       name: () => "Update interest rate",
       Status: TransactionStatus,
 
-      async commit({ contracts, request, wagmiConfig }) {
-        const { loan } = request;
-        const collateral = contracts.collaterals[loan.collIndex];
+      async commit(ctx) {
+        const { loan } = ctx.request;
+        const collateral = ctx.contracts.collaterals[loan.collIndex];
         if (!collateral) {
           throw new Error("Invalid collateral index: " + loan.collIndex);
         }
 
         const { BorrowerOperations } = collateral.contracts;
 
-        return writeContract(wagmiConfig, {
+        return ctx.writeContract({
           ...BorrowerOperations,
           functionName: "removeFromBatch",
           args: [
@@ -266,15 +279,15 @@ export const updateLoanInterestRate: FlowDeclaration<UpdateLoanInterestRateReque
         });
       },
 
-      async verify({ request, wagmiConfig }, hash) {
-        await verifyTroveUpdate(wagmiConfig, hash, request.loan);
+      async verify(ctx, hash) {
+        await verifyTroveUpdate(ctx.wagmiConfig, hash, ctx.request.loan);
       },
     },
   },
 
-  async getSteps({ contracts, request, wagmiConfig }) {
-    const loan = request.loan;
-    const collateral = contracts.collaterals[loan.collIndex];
+  async getSteps(ctx) {
+    const loan = ctx.request.loan;
+    const collateral = ctx.contracts.collaterals[loan.collIndex];
     if (!collateral) {
       throw new Error("Invalid collateral index: " + loan.collIndex);
     }
@@ -284,7 +297,7 @@ export const updateLoanInterestRate: FlowDeclaration<UpdateLoanInterestRateReque
     }
 
     const isInBatch = (
-      await readContract(wagmiConfig, {
+      await ctx.readContract({
         ...collateral.contracts.BorrowerOperations,
         functionName: "interestBatchManagerOf",
         args: [BigInt(loan.troveId)],

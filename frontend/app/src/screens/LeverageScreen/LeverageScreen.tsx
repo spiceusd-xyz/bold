@@ -5,7 +5,7 @@ import type { Address, PositionLoanUncommitted } from "@/src/types";
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
 
 import { Amount } from "@/src/comps/Amount/Amount";
-import { ConnectWarningBox } from "@/src/comps/ConnectWarningBox/ConnectWarningBox";
+// import { ConnectWarningBox } from "@/src/comps/ConnectWarningBox/ConnectWarningBox";
 import { Field } from "@/src/comps/Field/Field";
 import { InterestRateField } from "@/src/comps/InterestRateField/InterestRateField";
 import { LeverageField, useLeverageField } from "@/src/comps/LeverageField/LeverageField";
@@ -233,7 +233,7 @@ export function LeverageScreen() {
               label={content.leverageScreen.depositField.label}
               placeholder="0.00"
               secondary={{
-                start: depositUsd && `$${fmtnum(depositUsd, "2z")}`,
+                start: fmtnum(depositUsd, { prefix: "$", preset: "2z" }),
                 end: maxAmount
                   ? (
                     <TextButton
@@ -358,7 +358,7 @@ export function LeverageScreen() {
             width: "100%",
           })}
         >
-          <ConnectWarningBox />
+          {/*<ConnectWarningBox />*/}
           <div
             className={css({
               display: "flex",
@@ -369,8 +369,8 @@ export function LeverageScreen() {
             })}
           >
             <Button
-              disabled={!allowSubmit}
-              label={content.leverageScreen.action}
+              disabled={true || !allowSubmit}
+              label="Coming Soon"
               mode="primary"
               size="large"
               wide
@@ -395,7 +395,8 @@ export function LeverageScreen() {
               }}
             />
 
-            {leverageSlippageElements.mode === "error"
+            {
+              /*leverageSlippageElements.mode === "error"
               ? (
                 <div
                   className={css({
@@ -409,7 +410,8 @@ export function LeverageScreen() {
                 <div>
                   {leverageSlippageElements.message}
                 </div>
-              )}
+              )*/
+            }
           </div>
         </div>
       </div>
@@ -490,9 +492,8 @@ function useSlippageElements(
       <>
         Slippage too high: {fmtnum(
           leverageSlippage.data,
-          2,
-          100,
-        )}% (max {fmtnum(LEVERAGE_MAX_SLIPPAGE, 2, 100)}%)
+          "pct2",
+        )}% (max {fmtnum(LEVERAGE_MAX_SLIPPAGE, "pct2")}%)
       </>
     );
     return {

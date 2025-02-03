@@ -7,6 +7,7 @@ import { ERC20Faucet } from "@/src/abi/ERC20Faucet";
 import { Positions } from "@/src/comps/Positions/Positions";
 import { Screen } from "@/src/comps/Screen/Screen";
 import { getCollateralContract, getContracts, getProtocolContract } from "@/src/contracts";
+import { CHAIN_ID } from "@/src/env";
 import { fmtnum } from "@/src/formatting";
 import { useAccount, useBalance } from "@/src/services/Ethereum";
 import { css } from "@/styled-system/css";
@@ -31,6 +32,7 @@ export function AccountScreen({
 }) {
   const account = useAccount();
   const collSymbols = getContracts().collaterals.map((coll) => coll.symbol);
+  const tapEnabled = CHAIN_ID !== 1;
   return (
     <Screen>
       <VFlex gap={32}>
@@ -114,7 +116,15 @@ export function AccountScreen({
               <Balance
                 address={address}
                 tokenSymbol="LQTY"
-                tapButton={account.address && addressesEqual(address, account.address)}
+                tapButton={tapEnabled
+                  && account.address
+                  && addressesEqual(address, account.address)}
+              />
+            </GridItem>
+            <GridItem label="LUSD balance">
+              <Balance
+                address={address}
+                tokenSymbol="LUSD"
               />
             </GridItem>
             {collSymbols.map((symbol) => (
@@ -125,7 +135,9 @@ export function AccountScreen({
                 <Balance
                   address={address}
                   tokenSymbol={symbol}
-                  tapButton={symbol !== "ETH" && account.address && addressesEqual(address, account.address)}
+                  tapButton={tapEnabled
+                    && symbol !== "ETH" && account.address
+                    && addressesEqual(address, account.address)}
                 />
               </GridItem>
             ))}
