@@ -5,12 +5,14 @@ import type { TokenSymbol } from "@/src/types";
 import { Amount } from "@/src/comps/Amount/Amount";
 import { Logo } from "@/src/comps/Logo/Logo";
 import { ACCOUNT_SCREEN } from "@/src/env";
-import { useLiquityStats } from "@/src/liquity-utils";
+import { getContracts } from "@/src/contracts";
 import { useAccount } from "@/src/services/Ethereum";
 import { usePrice } from "@/src/services/Prices";
+import { useTotalDeposited } from "@/src/subgraph-hooks";
 import { css } from "@/styled-system/css";
 import { AnchorTextButton, BOLD_TOKEN_SYMBOL, HFlex, shortenAddress, TokenIcon } from "@liquity2/uikit";
 import { blo } from "blo";
+import * as dn from "dnum";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -22,10 +24,7 @@ const DISPLAYED_PRICES = [
 
 export function ProtocolStats() {
   const account = useAccount();
-  const stats = useLiquityStats();
-
-  const tvl = stats.data?.totalValueLocked;
-
+  const tvl = useTvl();
   return (
     <div
       className={css({
@@ -49,14 +48,12 @@ export function ProtocolStats() {
           <Logo size={16} />
           <span>TVL</span>{" "}
           <span>
-            {tvl && (
-              <Amount
-                fallback="…"
-                format="compact"
-                prefix="$"
-                value={tvl}
-              />
-            )}
+            <Amount
+              fallback="…"
+              format="compact"
+              prefix="$"
+              value={tvl}
+            />
           </span>
         </HFlex>
         <HFlex gap={16}>
@@ -131,4 +128,33 @@ function Price({ symbol }: { symbol: TokenSymbol }) {
       </HFlex>
     </HFlex>
   );
+}
+
+function useTvl() {
+  const { collaterals } = getContracts();
+  const totalDeposited = useTotalDeposited();
+  const collPrices = Object.fromEntries(collaterals.map((collateral) => (
+    [collateral.symbol, usePrice(collateral.symbol)] as const
+  ))) as Record<TokenSymbol, ReturnType<typeof usePrice>>;
+
+  // make sure all prices and the total deposited have loaded before calculating the TVL
+  if (
+    !Object.values(collPrices).every((cp) => cp.status === "success")
+    || totalDeposited.status !== "success"
+  ) {
+    return null;
+  }
+
+  const tvlByCollateral = collaterals.map((collateral, collIndex) => {
+    const price = collPrices[collateral.symbol].data;
+    const collDeposited = totalDeposited.data[collIndex];
+    return price && collDeposited && dn.mul(price, collDeposited.totalDeposited);
+  });
+
+  let tvl = dn.from(0, 18);
+  for (const value of tvlByCollateral ?? []) {
+    tvl = value ? dn.add(tvl, value) : tvl;
+  }
+
+  return tvl;
 }
