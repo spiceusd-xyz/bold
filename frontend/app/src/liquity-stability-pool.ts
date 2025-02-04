@@ -92,7 +92,7 @@ type DepositParameters = {
   BFromEpochScalePlusOne: bigint;
 };
 
-function useSpYieldGainParameters(symbol: CollateralSymbol | null) {
+export function useSpYieldGainParameters(symbol: CollateralSymbol | null) {
   const ActivePool = getCollateralContract(symbol, "ActivePool");
   const StabilityPool = getCollateralContract(symbol, "StabilityPool");
 
@@ -200,6 +200,28 @@ function getDepositorYieldGainWithPending(
   const secondPortion = (BFromEpochScalePlusOne + secondPortionPending) / SCALE_FACTOR;
 
   return initialDeposit * (firstPortion + secondPortion) / snapshotsP / DECIMAL_PRECISION;
+}
+
+export function calculateStabilityPoolApr(
+  spYieldGainParams: SPYieldGainParameters,
+) {
+  const { aggWeightedDebtSum, totalBoldDeposits, lastAggUpdateTime, yieldGainsPending } = spYieldGainParams;
+
+  if (totalBoldDeposits === 0n) {
+    return null;
+  }
+
+  const now = BigInt(Date.now());
+
+  const pendingSPYield = calcPendingSPYield(
+    aggWeightedDebtSum,
+    lastAggUpdateTime * 1000n,
+    now,
+  ) + yieldGainsPending;
+
+  const annualizedYield = (pendingSPYield * ONE_YEAR) / (now - (lastAggUpdateTime * 1000n));
+
+  return dnum18((annualizedYield * DECIMAL_PRECISION) / totalBoldDeposits);
 }
 
 // activePool.calcPendingSPYield()
