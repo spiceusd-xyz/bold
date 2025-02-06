@@ -11,6 +11,7 @@ import { vCollIndex, vPositionEarn } from "@/src/valibot-utils";
 import * as dn from "dnum";
 import * as v from "valibot";
 import { createRequestSchema, verifyTransaction } from "./shared";
+import { BOLD_TOKEN_SYMBOL } from "@liquity2/uikit";
 
 const RequestSchema = createRequestSchema(
   "earnUpdate",
@@ -63,7 +64,7 @@ export const earnUpdate: FlowDeclaration<EarnUpdateRequest> = {
 
     const collateral = getCollToken(earnPosition.collIndex);
 
-    const boldPrice = usePrice("BOLD");
+    const boldPrice = usePrice(BOLD_TOKEN_SYMBOL);
     const collPrice = usePrice(collateral.symbol);
 
     const depositChange = dn.sub(earnPosition.deposit, prevEarnPosition.deposit);
@@ -78,7 +79,7 @@ export const earnUpdate: FlowDeclaration<EarnUpdateRequest> = {
           value={[
             <Amount
               key="start"
-              suffix=" BOLD"
+              suffix={` ${BOLD_TOKEN_SYMBOL}`}
               value={dn.abs(depositChange)}
             />,
             <Amount
@@ -90,12 +91,12 @@ export const earnUpdate: FlowDeclaration<EarnUpdateRequest> = {
         />
         {dn.gt(rewards.bold, 0) && (
           <TransactionDetailsRow
-            label={claimRewards ? "Claim BOLD rewards" : "Compound BOLD rewards"}
+            label={claimRewards ? `Claim ${BOLD_TOKEN_SYMBOL} rewards` : `Compound ${BOLD_TOKEN_SYMBOL} rewards`}
             value={[
               <Amount
                 key="start"
                 value={rewards.bold}
-                suffix=" BOLD"
+                suffix={` ${BOLD_TOKEN_SYMBOL}`}
               />,
               <Amount
                 key="end"
