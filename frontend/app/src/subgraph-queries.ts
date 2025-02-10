@@ -42,25 +42,6 @@ export const BorrowerInfoQuery = graphql(`
   }
 `);
 
-export const TotalDepositedQuery = graphql(`
-  query TotalDeposited {
-    collaterals {
-      collIndex
-      totalDeposited
-    }
-  }
-`);
-
-export const TrovesCountQuery = graphql(`
-  query TrovesCount($id: ID!) {
-    borrowerInfo(id: $id) {
-      nextOwnerIndexes
-      troves
-      trovesByCollateral
-    }
-  }
-`);
-
 export const FullTroveQueryFragment = graphql(`
   fragment FullTroveFragment on Trove {
     id
