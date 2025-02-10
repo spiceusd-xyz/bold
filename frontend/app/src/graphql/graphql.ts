@@ -2206,18 +2206,6 @@ export type BorrowerInfoQueryVariables = Exact<{
 
 export type BorrowerInfoQuery = { __typename?: 'Query', borrowerInfo?: { __typename?: 'BorrowerInfo', nextOwnerIndexes: Array<number>, troves: number, trovesByCollateral: Array<number> } | null };
 
-export type TotalDepositedQueryVariables = Exact<{ [key: string]: never; }>;
-
-
-export type TotalDepositedQuery = { __typename?: 'Query', collaterals: Array<{ __typename?: 'Collateral', collIndex: number, totalDeposited: bigint }> };
-
-export type TrovesCountQueryVariables = Exact<{
-  id: Scalars['ID']['input'];
-}>;
-
-
-export type TrovesCountQuery = { __typename?: 'Query', borrowerInfo?: { __typename?: 'BorrowerInfo', nextOwnerIndexes: Array<number>, troves: number, trovesByCollateral: Array<number> } | null };
-
 export type FullTroveFragmentFragment = { __typename?: 'Trove', id: string, borrower: string, closedAt?: bigint | null, createdAt: bigint, debt: bigint, deposit: bigint, interestRate: bigint, mightBeLeveraged: boolean, stake: bigint, status: TroveStatus, troveId: string, updatedAt: bigint, collateral: { __typename?: 'Collateral', id: string, minCollRatio: bigint, collIndex: number, token: { __typename?: 'Token', symbol: string, name: string } }, interestBatch?: { __typename?: 'InterestBatch', id: string, annualInterestRate: bigint, annualManagementFee: bigint, batchManager: string } | null } & { ' $fragmentName'?: 'FullTroveFragmentFragment' };
 
 export type TrovesByAccountQueryVariables = Exact<{
@@ -2369,23 +2357,6 @@ export const BorrowerInfoDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<BorrowerInfoQuery, BorrowerInfoQueryVariables>;
-export const TotalDepositedDocument = new TypedDocumentString(`
-    query TotalDeposited {
-  collaterals {
-    collIndex
-    totalDeposited
-  }
-}
-    `) as unknown as TypedDocumentString<TotalDepositedQuery, TotalDepositedQueryVariables>;
-export const TrovesCountDocument = new TypedDocumentString(`
-    query TrovesCount($id: ID!) {
-  borrowerInfo(id: $id) {
-    nextOwnerIndexes
-    troves
-    trovesByCollateral
-  }
-}
-    `) as unknown as TypedDocumentString<TrovesCountQuery, TrovesCountQueryVariables>;
 export const TrovesByAccountDocument = new TypedDocumentString(`
     query TrovesByAccount($account: Bytes!) {
   troves(
