@@ -120,7 +120,7 @@ export async function main() {
 
   const forgeArgs: string[] = [
     "script",
-    "DeployLiquity2Script",
+    "script/DeploySpiceUsd.s.sol:DeploySpiceUsdScript",
     "--chain-id",
     String(options.chainId),
     "--rpc-url",

@@ -16,13 +16,14 @@ contract NrPriceFeed is IPriceFeed {
         stPriceFeed = _stPriceFeed;
         nrToken = _nrToken;
         stDecimals = IERC20Metadata(_nrToken.TOKEN()).decimals();
+        fetchPrice();
     }
 
     function _scale(uint256 stPrice) internal view returns (uint256) {
         return (10 ** stDecimals * stPrice) / nrToken.tokensPerStERC20();
     }
 
-    function fetchPrice() external returns (uint256, bool) {
+    function fetchPrice() public returns (uint256, bool) {
         (uint256 stPrice, bool b) = stPriceFeed.fetchPrice();
         uint256 price = _scale(stPrice);
         lastGoodPrice = price;

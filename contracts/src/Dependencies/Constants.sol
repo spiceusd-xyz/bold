@@ -10,7 +10,7 @@ uint256 constant _100pct = DECIMAL_PRECISION;
 uint256 constant _1pct = DECIMAL_PRECISION / 100;
 
 // Amount of ETH to be locked in gas pool on opening troves
-uint256 constant ETH_GAS_COMPENSATION = 0.0375 ether;
+uint256 constant ETH_GAS_COMPENSATION = 0.0005 ether;
 
 // Liquidation
 uint256 constant MIN_LIQUIDATION_PENALTY_SP = 5e16; // 5%
@@ -18,17 +18,17 @@ uint256 constant MAX_LIQUIDATION_PENALTY_REDISTRIBUTION = 20e16; // 20%
 
 // Fraction of collateral awarded to liquidator
 uint256 constant COLL_GAS_COMPENSATION_DIVISOR = 200; // dividing by 200 yields 0.5%
-uint256 constant COLL_GAS_COMPENSATION_CAP = 2 ether; // Max coll gas compensation capped at 2 ETH
+uint256 constant COLL_GAS_COMPENSATION_CAP = MAX_UINT256;
 
 // Minimum amount of net Bold debt a trove must have
-uint256 constant MIN_DEBT = 2000e18;
+uint256 constant MIN_DEBT = 100e18;
 
 uint256 constant MIN_ANNUAL_INTEREST_RATE = _1pct / 2; // 0.5%
-uint256 constant MAX_ANNUAL_INTEREST_RATE = _100pct;
+uint256 constant MAX_ANNUAL_INTEREST_RATE = 250 * _1pct;
 
 // Batch management params
 uint128 constant MAX_ANNUAL_BATCH_MANAGEMENT_FEE = uint128(_100pct / 10); // 10%
-uint128 constant MIN_INTEREST_RATE_CHANGE_PERIOD = 120 seconds; // prevents more than one adjustment per ~10 blocks
+uint128 constant MIN_INTEREST_RATE_CHANGE_PERIOD = 1 hours; // prevents more than one adjustment per ~10 blocks
 
 uint256 constant REDEMPTION_FEE_FLOOR = _1pct / 2; // 0.5%
 

@@ -29,8 +29,8 @@ interface IMetadataNFT {
 contract MetadataNFT is IMetadataNFT {
     FixedAssetReader public immutable assetReader;
 
-    string public constant name = "Liquity V2 Trove";
-    string public constant description = "Liquity V2 Trove position";
+    string public constant name = "SpiceUSD Trove";
+    string public constant description = "SpiceUSD Trove position";
 
     constructor(FixedAssetReader _assetReader) {
         assetReader = _assetReader;

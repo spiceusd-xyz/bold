@@ -31,7 +31,7 @@ contract ActivePool is IActivePool {
 
     IBoldToken public immutable boldToken;
 
-    IInterestRouter public immutable interestRouter;
+    IInterestRouter public interestRouter;
     IBoldRewardsReceiver public immutable stabilityPool;
 
     uint256 internal collBalance; // deposited coll tracker
@@ -295,6 +295,11 @@ contract ActivePool is IActivePool {
         }
 
         lastAggBatchManagementFeesUpdateTime = block.timestamp;
+    }
+
+    function updateInterestRouter(IInterestRouter _interestRouter) external {
+        require(msg.sender == address(interestRouter), "caller is not the current interest router");
+        interestRouter = _interestRouter;
     }
 
     // --- Shutdown ---
