@@ -148,8 +148,6 @@ export type Collateral = {
   minCollRatio: Scalars['BigInt']['output'];
   stabilityPoolDeposits: Array<StabilityPoolDeposit>;
   token: Token;
-  totalDebt: Scalars['BigInt']['output'];
-  totalDeposited: Scalars['BigInt']['output'];
   troves: Array<Trove>;
 };
 
@@ -285,8 +283,6 @@ export enum CollateralAddresses_OrderBy {
   CollateralCollIndex = 'collateral__collIndex',
   CollateralId = 'collateral__id',
   CollateralMinCollRatio = 'collateral__minCollRatio',
-  CollateralTotalDebt = 'collateral__totalDebt',
-  CollateralTotalDeposited = 'collateral__totalDeposited',
   Id = 'id',
   SortedTroves = 'sortedTroves',
   StabilityPool = 'stabilityPool',
@@ -347,22 +343,6 @@ export type Collateral_Filter = {
   token_not_starts_with_nocase?: InputMaybe<Scalars['String']['input']>;
   token_starts_with?: InputMaybe<Scalars['String']['input']>;
   token_starts_with_nocase?: InputMaybe<Scalars['String']['input']>;
-  totalDebt?: InputMaybe<Scalars['BigInt']['input']>;
-  totalDebt_gt?: InputMaybe<Scalars['BigInt']['input']>;
-  totalDebt_gte?: InputMaybe<Scalars['BigInt']['input']>;
-  totalDebt_in?: InputMaybe<Array<Scalars['BigInt']['input']>>;
-  totalDebt_lt?: InputMaybe<Scalars['BigInt']['input']>;
-  totalDebt_lte?: InputMaybe<Scalars['BigInt']['input']>;
-  totalDebt_not?: InputMaybe<Scalars['BigInt']['input']>;
-  totalDebt_not_in?: InputMaybe<Array<Scalars['BigInt']['input']>>;
-  totalDeposited?: InputMaybe<Scalars['BigInt']['input']>;
-  totalDeposited_gt?: InputMaybe<Scalars['BigInt']['input']>;
-  totalDeposited_gte?: InputMaybe<Scalars['BigInt']['input']>;
-  totalDeposited_in?: InputMaybe<Array<Scalars['BigInt']['input']>>;
-  totalDeposited_lt?: InputMaybe<Scalars['BigInt']['input']>;
-  totalDeposited_lte?: InputMaybe<Scalars['BigInt']['input']>;
-  totalDeposited_not?: InputMaybe<Scalars['BigInt']['input']>;
-  totalDeposited_not_in?: InputMaybe<Array<Scalars['BigInt']['input']>>;
   troves_?: InputMaybe<Trove_Filter>;
 };
 
@@ -384,8 +364,6 @@ export enum Collateral_OrderBy {
   TokenId = 'token__id',
   TokenName = 'token__name',
   TokenSymbol = 'token__symbol',
-  TotalDebt = 'totalDebt',
-  TotalDeposited = 'totalDeposited',
   Troves = 'troves'
 }
 
@@ -845,8 +823,6 @@ export enum InterestBatch_OrderBy {
   CollateralCollIndex = 'collateral__collIndex',
   CollateralId = 'collateral__id',
   CollateralMinCollRatio = 'collateral__minCollRatio',
-  CollateralTotalDebt = 'collateral__totalDebt',
-  CollateralTotalDeposited = 'collateral__totalDeposited',
   Debt = 'debt',
   Id = 'id',
   Troves = 'troves'
@@ -917,8 +893,6 @@ export enum InterestRateBracket_OrderBy {
   CollateralCollIndex = 'collateral__collIndex',
   CollateralId = 'collateral__id',
   CollateralMinCollRatio = 'collateral__minCollRatio',
-  CollateralTotalDebt = 'collateral__totalDebt',
-  CollateralTotalDeposited = 'collateral__totalDeposited',
   Id = 'id',
   Rate = 'rate',
   TotalDebt = 'totalDebt'
@@ -1436,8 +1410,6 @@ export enum StabilityPoolDeposit_OrderBy {
   CollateralCollIndex = 'collateral__collIndex',
   CollateralId = 'collateral__id',
   CollateralMinCollRatio = 'collateral__minCollRatio',
-  CollateralTotalDebt = 'collateral__totalDebt',
-  CollateralTotalDeposited = 'collateral__totalDeposited',
   Deposit = 'deposit',
   Depositor = 'depositor',
   Id = 'id',
@@ -1951,8 +1923,6 @@ export enum Token_OrderBy {
   CollateralCollIndex = 'collateral__collIndex',
   CollateralId = 'collateral__id',
   CollateralMinCollRatio = 'collateral__minCollRatio',
-  CollateralTotalDebt = 'collateral__totalDebt',
-  CollateralTotalDeposited = 'collateral__totalDeposited',
   Decimals = 'decimals',
   Id = 'id',
   Name = 'name',
@@ -2142,8 +2112,6 @@ export enum Trove_OrderBy {
   CollateralCollIndex = 'collateral__collIndex',
   CollateralId = 'collateral__id',
   CollateralMinCollRatio = 'collateral__minCollRatio',
-  CollateralTotalDebt = 'collateral__totalDebt',
-  CollateralTotalDeposited = 'collateral__totalDeposited',
   CreatedAt = 'createdAt',
   Debt = 'debt',
   Deposit = 'deposit',
