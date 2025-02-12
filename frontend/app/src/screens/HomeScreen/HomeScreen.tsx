@@ -6,7 +6,13 @@ import { Amount } from "@/src/comps/Amount/Amount";
 import { Positions } from "@/src/comps/Positions/Positions";
 import { getContracts } from "@/src/contracts";
 import { DNUM_1 } from "@/src/dnum-utils";
-import { getCollIndexFromSymbol, getCollToken, useAverageInterestRate, useEarnPool } from "@/src/liquity-utils";
+import {
+  getCollIndexFromSymbol,
+  getCollToken,
+  useAverageInterestRate,
+  useBranchDebt,
+  useEarnPool,
+} from "@/src/liquity-utils";
 import { useAccount } from "@/src/services/Ethereum";
 import { css } from "@/styled-system/css";
 import { token } from "@/styled-system/tokens";
@@ -51,6 +57,7 @@ export function HomeScreen() {
             <span title="Maximum Loan-to-Value ratio">
               Max LTV
             </span>,
+            "Total debt",
             null,
           ] as const}
           rows={collSymbols.map((symbol) => (
@@ -88,6 +95,7 @@ function BorrowingRow({
   const collIndex = getCollIndexFromSymbol(symbol);
   const collateral = getCollToken(collIndex);
   const avgInterestRate = useAverageInterestRate(collIndex);
+  const branchDebt = useBranchDebt(collIndex);
 
   const maxLtv = collateral?.collateralRatio && dn.gt(collateral.collateralRatio, 0)
     ? dn.div(DNUM_1, collateral.collateralRatio)
@@ -118,6 +126,13 @@ function BorrowingRow({
         <Amount
           value={maxLtv}
           percentage
+        />
+      </td>
+      <td>
+        <Amount
+          format="compact"
+          prefix="$"
+          value={branchDebt.data}
         />
       </td>
       <td>
@@ -153,7 +168,8 @@ function BorrowingRow({
               title={`Borrow ${collateral?.name} from ${symbol}`}
             />
           </Link>
-          {/* <Link
+          {
+            /*<Link
             href={`/multiply/${symbol.toLowerCase()}`}
             legacyBehavior
             passHref
@@ -177,7 +193,8 @@ function BorrowingRow({
               }
               title={`Borrow ${collateral?.name} from ${symbol}`}
             />
-          </Link> */}
+          </Link>*/
+          }
         </div>
       </td>
     </tr>
