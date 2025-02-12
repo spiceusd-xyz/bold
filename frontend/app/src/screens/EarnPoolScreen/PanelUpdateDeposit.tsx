@@ -230,7 +230,7 @@ export function PanelUpdateDeposit({
                       color: "contentAlt",
                     })}
                   >
-                    BOLD
+                    {BOLD_TOKEN_SYMBOL}
                   </span>
                 </div>
                 {collateral && (
