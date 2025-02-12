@@ -1,6 +1,6 @@
 import type { Token } from "./types";
 
-import tokenBold from "./token-icons/SUSD.svg";
+import tokenBold from "./token-icons/SPICE.svg";
 import tokenEth from "./token-icons/eth.svg";
 import tokenLqty from "./token-icons/lqty.svg";
 import tokenLusd from "./token-icons/lusd.svg";
@@ -10,7 +10,7 @@ import tokenFnx from "./token-icons/FNX.png";
 import tokenHyper from "./token-icons/HYPER.png";
 import tokenThrust from "./token-icons/THRUSTER.png";
 
-export const BOLD_TOKEN_SYMBOL = 'SUSD';
+export const BOLD_TOKEN_SYMBOL = 'SPICE';
 
 export type CollateralSymbols = ["ETH", "USDB", "BLAST", "FNX", "HYPER", "THRUST"];
 
