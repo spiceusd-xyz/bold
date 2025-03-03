@@ -231,14 +231,12 @@ export const updateBorrowPosition: FlowDeclaration<UpdateBorrowPositionRequest> 
           throw new Error("ETH collateral not supported for adjustTrove");
         }
 
-        const normalizedCollChange = await getStERC20Amount(collateral.symbol, dn.abs(collChange), ctx);
-
         return ctx.writeContract({
           ...collateral.contracts.LeverageLSTZapper,
           functionName: "adjustTrove",
           args: [
             BigInt(loan.troveId),
-            normalizedCollChange[0],
+            dn.abs(collChange)[0],
             !dn.lt(collChange, 0n),
             dn.abs(debtChange)[0],
             !dn.lt(debtChange, 0n),
