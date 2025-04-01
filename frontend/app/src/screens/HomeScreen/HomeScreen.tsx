@@ -4,10 +4,10 @@ import type { CollateralSymbol } from "@/src/types";
 
 import { Amount } from "@/src/comps/Amount/Amount";
 import { Positions } from "@/src/comps/Positions/Positions";
-import { getContracts } from "@/src/contracts";
 import { DNUM_1 } from "@/src/dnum-utils";
 import {
-  getCollIndexFromSymbol,
+  getBranch,
+  getBranches,
   getCollToken,
   useAverageInterestRate,
   useBranchDebt,
@@ -23,10 +23,7 @@ import { HomeTable } from "./HomeTable";
 
 export function HomeScreen() {
   const account = useAccount();
-
-  const { collaterals } = getContracts();
-  const collSymbols = collaterals.map((coll) => coll.symbol);
-
+  const branches = getBranches();
   return (
     <div
       className={css({
@@ -60,7 +57,7 @@ export function HomeScreen() {
             "Total debt",
             null,
           ] as const}
-          rows={collSymbols.map((symbol) => (
+          rows={branches.map(({ symbol }) => (
             <BorrowingRow
               key={symbol}
               symbol={symbol}
@@ -80,7 +77,12 @@ export function HomeScreen() {
             "Pool size",
             null,
           ] as const}
-          rows={collSymbols.map((symbol) => <EarnRewardsRow key={symbol} symbol={symbol} />)}
+          rows={branches.map(({ symbol }) => (
+            <EarnRewardsRow
+              key={symbol}
+              symbol={symbol}
+            />
+          ))}
         />
       </div>
     </div>
@@ -92,10 +94,10 @@ function BorrowingRow({
 }: {
   symbol: CollateralSymbol;
 }) {
-  const collIndex = getCollIndexFromSymbol(symbol);
-  const collateral = getCollToken(collIndex);
-  const avgInterestRate = useAverageInterestRate(collIndex);
-  const branchDebt = useBranchDebt(collIndex);
+  const branch = getBranch(symbol);
+  const collateral = getCollToken(branch.id);
+  const avgInterestRate = useAverageInterestRate(branch.id);
+  const branchDebt = useBranchDebt(branch.id);
 
   const maxLtv = collateral?.collateralRatio && dn.gt(collateral.collateralRatio, 0)
     ? dn.div(DNUM_1, collateral.collateralRatio)
@@ -206,9 +208,9 @@ function EarnRewardsRow({
 }: {
   symbol: CollateralSymbol;
 }) {
-  const collIndex = getCollIndexFromSymbol(symbol);
-  const collateral = getCollToken(collIndex);
-  const earnPool = useEarnPool(collIndex);
+  const branch = getBranch(symbol);
+  const collateral = getCollToken(branch.id);
+  const earnPool = useEarnPool(branch.id);
 
   return (
     <tr>

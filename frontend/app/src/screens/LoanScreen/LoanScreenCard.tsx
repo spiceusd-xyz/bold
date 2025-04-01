@@ -85,7 +85,7 @@ export function LoanScreenCard({
     collateral.collateralRatio,
   );
 
-  const nftUrl = useTroveNftUrl(loan?.collIndex ?? null, troveId);
+  const nftUrl = useTroveNftUrl(loan?.branchId ?? null, troveId);
   const title = mode === "multiply" ? "Multiply" : `${BOLD_TOKEN_SYMBOL} loan`;
 
   const fullyRedeemed = loan && loan.status === "redeemed" && dn.eq(loan.borrowed, 0);

@@ -2218,12 +2218,12 @@ export type StabilityPoolEpochScaleQueryVariables = Exact<{
 
 export type StabilityPoolEpochScaleQuery = { __typename?: 'Query', stabilityPoolEpochScale?: { __typename?: 'StabilityPoolEpochScale', id: string, B: bigint, S: bigint } | null };
 
-export type InterestBatchQueryVariables = Exact<{
-  id: Scalars['ID']['input'];
+export type InterestBatchesQueryVariables = Exact<{
+  ids: Array<Scalars['ID']['input']> | Scalars['ID']['input'];
 }>;
 
 
-export type InterestBatchQuery = { __typename?: 'Query', interestBatch?: { __typename?: 'InterestBatch', batchManager: string, debt: bigint, coll: bigint, annualInterestRate: bigint, annualManagementFee: bigint, collateral: { __typename?: 'Collateral', collIndex: number } } | null };
+export type InterestBatchesQuery = { __typename?: 'Query', interestBatches: Array<{ __typename?: 'InterestBatch', batchManager: string, debt: bigint, coll: bigint, annualInterestRate: bigint, annualManagementFee: bigint, collateral: { __typename?: 'Collateral', collIndex: number } }> };
 
 export type AllInterestRateBracketsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -2450,9 +2450,9 @@ export const StabilityPoolEpochScaleDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<StabilityPoolEpochScaleQuery, StabilityPoolEpochScaleQueryVariables>;
-export const InterestBatchDocument = new TypedDocumentString(`
-    query InterestBatch($id: ID!) {
-  interestBatch(id: $id) {
+export const InterestBatchesDocument = new TypedDocumentString(`
+    query InterestBatches($ids: [ID!]!) {
+  interestBatches(where: {id_in: $ids}) {
     collateral {
       collIndex
     }
@@ -2463,7 +2463,7 @@ export const InterestBatchDocument = new TypedDocumentString(`
     annualManagementFee
   }
 }
-    `) as unknown as TypedDocumentString<InterestBatchQuery, InterestBatchQueryVariables>;
+    `) as unknown as TypedDocumentString<InterestBatchesQuery, InterestBatchesQueryVariables>;
 export const AllInterestRateBracketsDocument = new TypedDocumentString(`
     query AllInterestRateBrackets {
   interestRateBrackets(orderBy: rate) {

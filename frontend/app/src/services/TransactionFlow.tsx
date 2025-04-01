@@ -8,7 +8,7 @@ import type { Config as WagmiConfig } from "wagmi";
 import type { ReadContractOptions } from "wagmi/query";
 
 import { GAS_MIN_HEADROOM, GAS_RELATIVE_HEADROOM, LOCAL_STORAGE_PREFIX } from "@/src/constants";
-import { getContracts } from "@/src/contracts";
+import { CONTRACTS } from "@/src/contracts";
 import { jsonParseWithDnum, jsonStringifyWithDnum } from "@/src/dnum-utils";
 import { useAccount } from "@/src/services/Ethereum";
 import { useStoredState } from "@/src/services/StoredState";
@@ -31,6 +31,7 @@ import { earnClaimRewards, type EarnClaimRewardsRequest } from "@/src/tx-flows/e
 import { earnUpdate, type EarnUpdateRequest } from "@/src/tx-flows/earnUpdate";
 import { openBorrowPosition, type OpenBorrowPositionRequest } from "@/src/tx-flows/openBorrowPosition";
 import { openLeveragePosition, type OpenLeveragePositionRequest } from "@/src/tx-flows/openLeveragePosition";
+import { redeemCollateral, type RedeemCollateralRequest } from "@/src/tx-flows/redeemCollateral";
 import { stakeClaimRewards, type StakeClaimRewardsRequest } from "@/src/tx-flows/stakeClaimRewards";
 import { stakeDeposit, type StakeDepositRequest } from "@/src/tx-flows/stakeDeposit";
 import { unstakeDeposit, type UnstakeDepositRequest } from "@/src/tx-flows/unstakeDeposit";
@@ -47,6 +48,7 @@ export type FlowRequestMap = {
   "openBorrowPosition": OpenBorrowPositionRequest;
   "openLeveragePosition": OpenLeveragePositionRequest;
   "stakeClaimRewards": StakeClaimRewardsRequest;
+  "redeemCollateral": RedeemCollateralRequest;
   "stakeDeposit": StakeDepositRequest;
   "unstakeDeposit": UnstakeDepositRequest;
   "updateBorrowPosition": UpdateBorrowPositionRequest;
@@ -63,6 +65,7 @@ const FlowIdSchema = v.union([
   v.literal("openBorrowPosition"),
   v.literal("openLeveragePosition"),
   v.literal("stakeClaimRewards"),
+  v.literal("redeemCollateral"),
   v.literal("stakeDeposit"),
   v.literal("unstakeDeposit"),
   v.literal("updateBorrowPosition"),
@@ -79,6 +82,7 @@ export const flows: FlowsMap = {
   openBorrowPosition,
   openLeveragePosition,
   stakeClaimRewards,
+  redeemCollateral,
   stakeDeposit,
   unstakeDeposit,
   updateBorrowPosition,
@@ -138,12 +142,12 @@ export type FlowStepDeclaration<FlowRequest extends BaseFlowRequest = BaseFlowRe
 export type FlowDeclaration<FlowRequest extends BaseFlowRequest> = {
   title: ReactNode;
   Summary: ComponentType<{
-    account: Address | null;
+    account: Address;
     request: FlowRequest;
     steps: FlowStep[] | null;
   }>;
   Details: ComponentType<{
-    account: Address | null;
+    account: Address;
     request: FlowRequest;
     steps: FlowStep[] | null;
   }>;
@@ -154,14 +158,14 @@ export type FlowDeclaration<FlowRequest extends BaseFlowRequest> = {
 
 // passed to the react context + saved in local storage
 export type Flowstate<FlowRequest extends BaseFlowRequest = BaseFlowRequest> = {
-  account: Address | null;
+  account: Address;
   request: FlowRequest;
   steps: FlowStep[] | null;
 };
 
 // passed to the step functions
 export type FlowParams<FlowRequest extends BaseFlowRequest = BaseFlowRequest> = {
-  account: Address | null;
+  account: Address;
   contracts: Contracts;
   isSafe: boolean;
   preferredApproveMethod: "permit" | "approve-amount" | "approve-infinite";
@@ -326,7 +330,7 @@ export function TransactionFlow({
           ? {
             ...flow,
             account: account.address,
-            contracts: getContracts(),
+            contracts: CONTRACTS,
             isSafe: account.safeStatus !== null,
             preferredApproveMethod: storedState.preferredApproveMethod,
             readContract: getReadContract(wagmiConfig),
@@ -370,7 +374,7 @@ function useSteps(
 
       return flowDeclaration.getSteps({
         account: account.address,
-        contracts: getContracts(),
+        contracts: CONTRACTS,
         isSafe: account.safeStatus !== null,
         preferredApproveMethod: storedState.preferredApproveMethod,
         readContract: getReadContract(wagmiConfig),
@@ -423,7 +427,7 @@ function useFlowManager(account: Address | null, isSafe: boolean = false) {
       const params: FlowParams<FlowRequestMap[keyof FlowRequestMap]> = {
         readContract: getReadContract(wagmiConfig),
         account,
-        contracts: getContracts(),
+        contracts: CONTRACTS,
         isSafe,
         preferredApproveMethod: storedState.preferredApproveMethod,
         request: flow.request,

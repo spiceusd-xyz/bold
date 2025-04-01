@@ -5,7 +5,7 @@ import type { UseQueryResult } from "@tanstack/react-query";
 import type { Dnum } from "dnum";
 
 import { PRICE_REFRESH_INTERVAL } from "@/src/constants";
-import { getCollateralContract, getContracts } from "@/src/contracts";
+import { getBranchContract, getContracts } from "@/src/contracts";
 import { dnum18 } from "@/src/dnum-utils";
 import { COINGECKO_API_KEY } from "@/src/env";
 import { isCollateralSymbol } from "@liquity2/uikit";
@@ -21,15 +21,14 @@ import { readContract } from "@wagmi/core";
 type PriceToken = "LQTY" | BOLDTokenSymbol | "LUSD" | CollateralSymbol;
 
 function getCollateralTokenAddress(token: CollateralSymbol) {
-  const contracts = getContracts();
-  const collateral = contracts.collaterals.find((c) => c.symbol === token);
-  return collateral?.contracts.CollToken.address ?? null;
+  const collateral = getBranchContract(token, "CollToken");
+  return collateral.address;
 }
 
 function useCollateralPrice(symbol: null | CollateralSymbol): UseQueryResult<Dnum> {
   // "ETH" is a fallback when null is passed, so we can return a standard
   // query object from the PriceFeed ABI, while the query stays disabled
-  const PriceFeed = getCollateralContract(symbol ?? "ETH", "PriceFeed");
+  const PriceFeed = getBranchContract(symbol ?? "ETH", "PriceFeed");
 
   const wagmiConfig = useConfig();
 
@@ -57,10 +56,6 @@ function useCollateralPrice(symbol: null | CollateralSymbol): UseQueryResult<Dnu
       }
 
       const nrTokenAddress =  getCollateralTokenAddress(symbol);
-
-      if (!nrTokenAddress) {
-        throw new Error(`Cannot find collateral token address: ${symbol}`);
-      }
 
       const stERC20PerToken = await readContract(wagmiConfig, {
         abi: NrERC20,

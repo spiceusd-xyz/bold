@@ -3,8 +3,7 @@
 import type { ReactNode } from "react";
 
 import { a, useSpring, useTransition } from "@react-spring/web";
-import { useEffect, useState } from "react";
-import { forwardRef, useId, useRef } from "react";
+import { forwardRef, useEffect, useId, useRef, useState } from "react";
 import { css, cx } from "../../styled-system/css";
 import { token } from "../../styled-system/tokens";
 import { IconCross } from "../icons";
@@ -17,7 +16,7 @@ const diffSpringConfig = {
 };
 
 type Drawer = {
-  mode: "error" | "loading" | "success";
+  mode: "error" | "loading" | "success" | "warning";
   message: ReactNode;
   autoClose?: number;
 };
@@ -249,6 +248,7 @@ const InputField = forwardRef<HTMLInputElement, {
           <input
             ref={ref}
             id={id}
+            name={autoId}
             disabled={disabled}
             onBlur={() => {
               setFocused(false);

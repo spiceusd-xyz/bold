@@ -1,4 +1,4 @@
-import type { CollIndex, PositionEarn } from "@/src/types";
+import type { BranchId, PositionEarn } from "@/src/types";
 import type { Dnum } from "dnum";
 
 import { Amount } from "@/src/comps/Amount/Amount";
@@ -14,7 +14,7 @@ import { useAccount, useBalance } from "@/src/services/Ethereum";
 import { useTransactionFlow } from "@/src/services/TransactionFlow";
 import { infoTooltipProps } from "@/src/uikit-utils";
 import { css } from "@/styled-system/css";
-import { BOLD_TOKEN_SYMBOL, Button, Checkbox, HFlex, InfoTooltip, InputField, Tabs, TextButton, TokenIcon } from "@liquity2/uikit";
+import { BOLD_TOKEN_SYMBOL, Button, Checkbox, HFlex, InfoTooltip, InputField, TextButton, TokenIcon } from "@liquity2/uikit";
 import * as dn from "dnum";
 import { useState } from "react";
 
@@ -22,17 +22,17 @@ type ValueUpdateMode = "add" | "remove";
 
 export function PanelUpdateDeposit({
   deposited,
-  collIndex,
+  branchId,
   position,
 }: {
   deposited: Dnum;
-  collIndex: CollIndex;
+  branchId: BranchId;
   position?: PositionEarn;
 }) {
   const account = useAccount();
   const txFlow = useTransactionFlow();
 
-  const [mode, setMode] = useState<ValueUpdateMode>("add");
+  const [mode, _setMode] = useState<ValueUpdateMode>("remove");
   const [value, setValue] = useState("");
   const [focused, setFocused] = useState(false);
   const [claimRewards, setClaimRewards] = useState(true);
@@ -59,7 +59,7 @@ export function PanelUpdateDeposit({
     ? dn.div(updatedDeposit, updatedBoldQty)
     : DNUM_0;
 
-  const collateral = getCollToken(collIndex);
+  const collateral = getCollToken(branchId);
 
   const insufficientBalance = mode === "add"
     && parsedValue
@@ -114,11 +114,11 @@ export function PanelUpdateDeposit({
               start: mode === "remove"
                 ? content.earnScreen.withdrawPanel.label
                 : content.earnScreen.depositPanel.label,
-              end: (
+              end: null, /*(
                 <Tabs
                   compact
                   items={[
-                    { label: "Deposit", panelId: "panel-deposit", tabId: "tab-deposit" },
+                    { label: "Deposit", panelId: "panel-deposit", tabId: "tab-deposit", disabled: true },
                     { label: "Withdraw", panelId: "panel-withdraw", tabId: "tab-withdraw" },
                   ]}
                   onSelect={(index, { origin, event }) => {
@@ -131,7 +131,7 @@ export function PanelUpdateDeposit({
                   }}
                   selected={mode === "remove" ? 1 : 0}
                 />
-              ),
+              )*/
             }}
             labelHeight={32}
             onFocus={() => setFocused(true)}
@@ -264,7 +264,7 @@ export function PanelUpdateDeposit({
             const prevEarnPosition = position ?? {
               type: "earn" as const,
               owner: account.address,
-              collIndex,
+              branchId,
               deposit: DNUM_0,
               rewards: { bold: DNUM_0, coll: DNUM_0 },
             };
@@ -279,7 +279,7 @@ export function PanelUpdateDeposit({
               successMessage: mode === "remove"
                 ? "The withdrawal has been processed successfully."
                 : "The deposit has been processed successfully.",
-              collIndex,
+              branchId,
               prevEarnPosition,
               earnPosition: {
                 ...prevEarnPosition,

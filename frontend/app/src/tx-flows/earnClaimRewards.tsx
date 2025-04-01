@@ -2,7 +2,7 @@ import type { FlowDeclaration } from "@/src/services/TransactionFlow";
 
 import { Amount } from "@/src/comps/Amount/Amount";
 import { EarnPositionSummary } from "@/src/comps/EarnPositionSummary/EarnPositionSummary";
-import { getCollToken } from "@/src/liquity-utils";
+import { getBranch, getCollToken } from "@/src/liquity-utils";
 import { TransactionDetailsRow } from "@/src/screens/TransactionsScreen/TransactionsScreen";
 import { TransactionStatus } from "@/src/screens/TransactionsScreen/TransactionStatus";
 import { usePrice } from "@/src/services/Prices";
@@ -27,7 +27,7 @@ export const earnClaimRewards: FlowDeclaration<EarnClaimRewardsRequest> = {
   Summary({ request }) {
     return (
       <EarnPositionSummary
-        collIndex={request.earnPosition.collIndex}
+        branchId={request.earnPosition.branchId}
         earnPosition={request.earnPosition}
         txPreviewMode
       />
@@ -35,7 +35,7 @@ export const earnClaimRewards: FlowDeclaration<EarnClaimRewardsRequest> = {
   },
 
   Details({ request }) {
-    const collateral = getCollToken(request.earnPosition.collIndex);
+    const collateral = getCollToken(request.earnPosition.branchId);
 
     const boldPrice = usePrice(BOLD_TOKEN_SYMBOL);
     const collPrice = usePrice(collateral.symbol);
@@ -87,15 +87,10 @@ export const earnClaimRewards: FlowDeclaration<EarnClaimRewardsRequest> = {
       Status: TransactionStatus,
 
       async commit(ctx) {
-        const { collIndex } = ctx.request.earnPosition;
-        const collateral = ctx.contracts.collaterals[collIndex];
-        if (!collateral) {
-          throw new Error("Invalid collateral index: " + collIndex);
-        }
-
-        const { StabilityPool } = collateral.contracts;
+        const { branchId } = ctx.request.earnPosition;
+        const branch = getBranch(branchId);
         return ctx.writeContract({
-          ...StabilityPool,
+          ...branch.contracts.StabilityPool,
           functionName: "withdrawFromSP",
           args: [0n, true],
         });

@@ -3,14 +3,13 @@
 import type { ReactNode } from "react";
 
 import { Banner } from "@/Banner";
-import { useAbout } from "@/src/comps/About/About";
-import { ProtocolStats } from "@/src/comps/ProtocolStats/ProtocolStats";
-import { TopBar } from "@/src/comps/TopBar/TopBar";
 import { css } from "@/styled-system/css";
-import { TextButton } from "@liquity2/uikit";
+import { AnchorTextButton } from "@liquity2/uikit";
+import Link from "next/link";
+import { BottomBar } from "./BottomBar";
+import { TopBar } from "./TopBar";
 
 export const LAYOUT_WIDTH = 1092;
-export const MIN_WIDTH = 960;
 
 export function AppLayout({
   children,
@@ -18,93 +17,91 @@ export function AppLayout({
   children: ReactNode;
 }) {
   return (
-    <>
-      <Banner />
+    <div
+      className={css({
+        display: "grid",
+        gridTemplateRows: "auto 1fr",
+        minHeight: "100vh",
+        height: "100%",
+        background: "background",
+      })}
+    >
       <div
         className={css({
           display: "flex",
           flexDirection: "column",
-          alignItems: "flex-start",
+          gap: 1,
           width: "100%",
-          minHeight: "100vh",
-          margin: "0 auto",
-          background: "background",
         })}
-        style={{
-          minWidth: `${MIN_WIDTH}px`,
-          maxWidth: `${LAYOUT_WIDTH + 24 * 2}px`,
-        }}
       >
+        <Banner />
+        <EarnRiskBanner />
+      </div>
+      <div
+        className={css({
+          display: "grid",
+          gridTemplateRows: "auto 1fr auto",
+          gap: 48,
+          maxWidth: `calc(${LAYOUT_WIDTH}px + 48px)`,
+          margin: "0 auto",
+          width: "100%",
+        })}
+      >
+        <TopBar />
         <div
           className={css({
             width: "100%",
-            flexGrow: 0,
-            flexShrink: 0,
-            paddingBottom: 48,
+            minHeight: 0,
+            padding: "0 24px",
           })}
         >
-          <TopBar />
+          {children}
         </div>
-        <div
-          className={css({
-            flexGrow: 1,
-            display: "flex",
-            flexDirection: "column",
-          })}
-          style={{
-            width: `${LAYOUT_WIDTH + 24 * 2}px`,
-          }}
-        >
-          <div
-            className={css({
-              flexGrow: 1,
-              display: "flex",
-              flexDirection: "column",
-              width: "100%",
-              padding: "0 24px",
-            })}
-          >
-            {children}
-          </div>
-          <div
-            className={css({
-              width: "100%",
-              padding: "48px 24px 0",
-            })}
-          >
-            <BuildInfo />
-            <ProtocolStats />
-          </div>
-        </div>
+        <BottomBar />
       </div>
-    </>
+    </div>
   );
 }
 
-function BuildInfo() {
-  const about = useAbout();
+function EarnRiskBanner() {
   return (
     <div
       className={css({
         display: "flex",
+        justifyContent: "center",
         alignItems: "center",
-        justifyContent: "flex-end",
+        maxWidth: "100%",
+        width: "100%",
         height: 40,
+        padding: "0 16px",
+        textAlign: "center",
+        color: "#fff",
+        background: "strongSurface",
       })}
     >
-      <TextButton
-        label={about.fullVersion}
-        title={`About Liquity V2 App ${about.fullVersion}`}
-        onClick={() => {
-          about.openModal();
-        }}
+      <div
         className={css({
-          color: "dimmed",
+          width: "100%",
+          maxWidth: LAYOUT_WIDTH,
+          whiteSpace: "nowrap",
         })}
-        style={{
-          fontSize: 12,
-        }}
-      />
+      >
+        There is an issue affecting the Stability Pools (“Earn”).{" "}
+        <Link
+          href="https://www.liquity.org/blog/stability-pool-issue"
+          passHref
+          legacyBehavior
+        >
+          <AnchorTextButton
+            external
+            label="Please read this announcement"
+            className={css({
+              color: "inherit",
+              textDecoration: "underline",
+            })}
+          />
+        </Link>.
+      </div>
     </div>
   );
 }
