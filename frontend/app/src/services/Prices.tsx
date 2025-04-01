@@ -5,7 +5,7 @@ import type { UseQueryResult } from "@tanstack/react-query";
 import type { Dnum } from "dnum";
 
 import { PRICE_REFRESH_INTERVAL } from "@/src/constants";
-import { getBranchContract, getContracts } from "@/src/contracts";
+import { getBranchContract } from "@/src/contracts";
 import { dnum18 } from "@/src/dnum-utils";
 import { COINGECKO_API_KEY } from "@/src/env";
 import { isCollateralSymbol } from "@liquity2/uikit";

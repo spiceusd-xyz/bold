@@ -30,6 +30,7 @@ import {
   TroveByIdQuery,
   TrovesByAccountQuery,
 } from "./subgraph-queries";
+import { getIsNrERC20Token } from "./services/Ethereum";
 
 type Options = {
   refetchInterval?: number;
@@ -473,7 +474,7 @@ function subgraphTroveToLoan(
     borrower: trove.borrower,
     branchId,
     createdAt: Number(trove.createdAt) * 1000,
-    deposit: [BigInt(trove.deposit), (collIndex === 0 || collIndex === 1) ? 9 : 18],
+    deposit: [BigInt(trove.deposit), getIsNrERC20Token(trove.collateral.token.symbol) ? 9 : 18],
     interestRate: dnum18(trove.interestBatch?.annualInterestRate ?? trove.interestRate),
     troveId: trove.troveId,
     updatedAt: Number(trove.updatedAt) * 1000,

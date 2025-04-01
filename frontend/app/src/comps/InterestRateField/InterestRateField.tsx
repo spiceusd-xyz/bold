@@ -11,6 +11,7 @@ import { infoTooltipProps } from "@/src/uikit-utils";
 import { noop } from "@/src/utils";
 import { css } from "@/styled-system/css";
 import {
+  BOLD_TOKEN_SYMBOL,
   Dropdown,
   HFlex,
   InfoTooltip,

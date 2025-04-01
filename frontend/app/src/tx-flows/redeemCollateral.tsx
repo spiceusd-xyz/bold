@@ -16,6 +16,7 @@ import * as v from "valibot";
 import { createPublicClient } from "viem";
 import { http } from "wagmi";
 import { createRequestSchema, verifyTransaction } from "./shared";
+import { BOLD_TOKEN_SYMBOL } from "@liquity2/uikit";
 
 const RequestSchema = createRequestSchema(
   "redeemCollateral",
@@ -34,8 +35,8 @@ export const redeemCollateral: FlowDeclaration<RedeemCollateralRequest> = {
   Details(ctx) {
     const estimatedGains = useSimulatedBalancesChange(ctx);
     const branches = getBranches();
-    const boldChange = estimatedGains.data?.find(({ symbol }) => symbol === "BOLD")?.change;
-    const collChanges = estimatedGains.data?.filter(({ symbol }) => symbol !== "BOLD");
+    const boldChange = estimatedGains.data?.find(({ symbol }) => symbol === BOLD_TOKEN_SYMBOL)?.change;
+    const collChanges = estimatedGains.data?.filter(({ symbol }) => symbol !== BOLD_TOKEN_SYMBOL);
     return (
       <>
         <TransactionDetailsRow
@@ -50,15 +51,15 @@ export const redeemCollateral: FlowDeclaration<RedeemCollateralRequest> = {
           ]}
         />
         <TransactionDetailsRow
-          label="Reedeming BOLD"
+          label={`Reedeming ${BOLD_TOKEN_SYMBOL}`}
           value={[
             <Amount
               key="start"
               value={boldChange}
               fallback="fetching…"
-              suffix=" BOLD"
+              suffix={` ${BOLD_TOKEN_SYMBOL}`}
             />,
-            <>Estimated BOLD that will be redeemed.</>,
+            <>Estimated {BOLD_TOKEN_SYMBOL} that will be redeemed.</>,
           ]}
         />
         {branches.map(({ symbol }) => {
@@ -85,7 +86,7 @@ export const redeemCollateral: FlowDeclaration<RedeemCollateralRequest> = {
   },
   steps: {
     approve: {
-      name: () => "Approve BOLD",
+      name: () => `Approve ${BOLD_TOKEN_SYMBOL}`,
       Status: TransactionStatus,
       async commit({ request, writeContract }) {
         const CollateralRegistry = getProtocolContract("CollateralRegistry");
@@ -102,7 +103,7 @@ export const redeemCollateral: FlowDeclaration<RedeemCollateralRequest> = {
       },
     },
     redeemCollateral: {
-      name: () => "Redeem BOLD",
+      name: () => `Redeem ${BOLD_TOKEN_SYMBOL}`,
       Status: TransactionStatus,
       async commit({ request, writeContract }) {
         const CollateralRegistry = getProtocolContract("CollateralRegistry");
@@ -225,7 +226,7 @@ export function useSimulatedBalancesChange({
         return simulation.results
           .slice(position, position + branches.length + 1)
           .map((result, index) => {
-            const symbol = index === 0 ? "BOLD" : branches[index - 1]?.symbol;
+            const symbol = index === 0 ? BOLD_TOKEN_SYMBOL : branches[index - 1]?.symbol;
             return {
               symbol,
               balance: dnum18(result.data ?? 0n),

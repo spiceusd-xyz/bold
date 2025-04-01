@@ -2,7 +2,7 @@
 
 import "@rainbow-me/rainbowkit/styles.css";
 
-import type { CollIndex, Token } from "@/src/types";
+import type { BranchId, Token } from "@/src/types";
 import type { Address, CollateralSymbol, TokenSymbol } from "@liquity2/uikit";
 import type { ComponentProps, ReactNode } from "react";
 import type { Chain } from "wagmi/chains";
@@ -25,7 +25,7 @@ import {
   CONTRACT_LUSD_TOKEN,
   WALLET_CONNECT_PROJECT_ID,
 } from "@/src/env";
-import { getBranch } from "@/src/liquity-utils";
+import { getBranch, getBranches } from "@/src/liquity-utils";
 import { getSafeStatus } from "@/src/safe-utils";
 import { noop } from "@/src/utils";
 import { BOLD_TOKEN_SYMBOL, isCollateralSymbol, useTheme } from "@liquity2/uikit";
@@ -240,16 +240,17 @@ function createChain({
   } satisfies Chain;
 }
 
-export function getIsNrERC20Token (symbol: TokenSymbol | null | undefined) {
+export function getIsNrERC20Token (symbol: string | null | undefined) {
   return ['ETH', 'USDB'].includes(symbol ?? '');
 }
 
 export function useNrERC20Amount(symbol: CollateralSymbol | null, stERC20Amount: dn.Dnum | null | undefined) {
+  const branch = symbol !== null ? getBranch(symbol) : null;
   const isNrERC20Token = getIsNrERC20Token(symbol);
 
   const {data: tokensPerStERC20} = useReadContract({
     abi: NrERC20,
-    address: getCollateralContract(symbol, 'CollToken')?.address,
+    address: branch?.contracts.CollToken.address,
     functionName: 'tokensPerStERC20',
     query: {
       enabled: isNrERC20Token,
@@ -268,13 +269,13 @@ export function useNrERC20Amount(symbol: CollateralSymbol | null, stERC20Amount:
 }
 
 
-export function useStERC20Amount(symbol: TokenSymbol | CollIndex | null | undefined, nrERC20Amount: dn.Dnum | null | undefined) {
-  const collateral = getContracts().collaterals.find(collateral => typeof symbol === 'number' ? collateral.collIndex === symbol : collateral.symbol === symbol);
-  const isNrERC20Token = getIsNrERC20Token(collateral?.symbol);
+export function useStERC20Amount(symbol: TokenSymbol | BranchId | null | undefined, nrERC20Amount: dn.Dnum | null | undefined) {
+  const branch = getBranches().find(branch => typeof symbol === 'number' ? branch.branchId === symbol : branch.symbol === symbol);
+  const isNrERC20Token = getIsNrERC20Token(branch?.symbol);
 
   const {data: stERC20PerToken} = useReadContract({
     abi: NrERC20,
-    address: collateral?.contracts.CollToken.address,
+    address: branch?.contracts.CollToken.address,
     functionName: 'stERC20PerToken',
     query: {
       enabled: isNrERC20Token,
@@ -293,8 +294,8 @@ export function useStERC20Amount(symbol: TokenSymbol | CollIndex | null | undefi
 }
 
 export async function getStERC20Amount(symbol: CollateralSymbol, collAmount: dn.Dnum, ctx: FlowParams) {
-  const collateral = getContracts().collaterals.find(collateral => typeof symbol === 'number' ? collateral.collIndex === symbol : collateral.symbol === symbol)!;
-  const isNrERC20Token = getIsNrERC20Token(collateral?.symbol);
+  const branch = getBranch(symbol);
+  const isNrERC20Token = getIsNrERC20Token(branch.symbol);
 
   if (!isNrERC20Token) {
     return collAmount;
@@ -302,7 +303,7 @@ export async function getStERC20Amount(symbol: CollateralSymbol, collAmount: dn.
 
   const stERC20PerToken = await ctx.readContract({
     abi: NrERC20,
-    address: getCollateralContract(symbol, 'CollToken')?.address ?? '0x',
+    address: branch.contracts.CollToken.address,
     functionName: 'stERC20PerToken',
   });
 
@@ -312,7 +313,7 @@ export async function getStERC20Amount(symbol: CollateralSymbol, collAmount: dn.
 
 export function getApprovalAddress (symbol: CollateralSymbol) {
   return symbol === 'USDB' ? CONTRACT_USDB_TOKEN :
-    getContracts().collaterals.find(collateral => collateral.symbol === symbol)!.contracts.CollToken.address;
+    getBranch(symbol).contracts.CollToken.address;
 }
 
 export async function getApprovalAmount (symbol: CollateralSymbol, collAmount: dn.Dnum, ctx: FlowParams): Promise<bigint> { 

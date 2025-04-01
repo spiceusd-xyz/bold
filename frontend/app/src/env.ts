@@ -1,4 +1,4 @@
-import type { Address, Branch, BranchId } from "@/src/types";
+import type { Address, Branch, BranchId, CollateralSymbol } from "@/src/types";
 
 import { isBranchId } from "@/src/types";
 import { vAddress, vEnvAddressAndBlock, vEnvCurrency, vEnvFlag, vEnvLink, vEnvUrlOrDefault } from "@/src/valibot-utils";
@@ -249,7 +249,7 @@ export const EnvSchema = v.pipe(
         ) as Array<{ address: Address; name: string }>,
         symbol: (
           env[`${collEnvName}_TOKEN_ID` as keyof typeof env]
-        ) as v.InferOutput<typeof CollateralSymbolSchema>,
+        ) as CollateralSymbol,
       };
     }
 

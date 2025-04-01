@@ -5,7 +5,7 @@ import { fmtnum, formatDuration, formatRedemptionRisk } from "@/src/formatting";
 import { getRedemptionRisk } from "@/src/liquity-math";
 import { riskLevelToStatusMode } from "@/src/uikit-utils";
 import { css } from "@/styled-system/css";
-import { Button, IconCopy, StatusDot, TextButton } from "@liquity2/uikit";
+import { BOLD_TOKEN_SYMBOL, Button, IconCopy, StatusDot, TextButton } from "@liquity2/uikit";
 import { MiniChart } from "./MiniChart";
 import { ShadowBox } from "./ShadowBox";
 
@@ -83,7 +83,7 @@ export function DelegateBox({
               <Amount
                 value={delegate.boldAmount}
                 format="compact"
-                suffix=" BOLD"
+                suffix={` ${BOLD_TOKEN_SYMBOL}`}
               />
             </div>
             <div

@@ -10,12 +10,16 @@ import { useLiquityStats } from "@/src/liquity-utils";
 import { useAccount } from "@/src/services/Ethereum";
 import { usePrice } from "@/src/services/Prices";
 import { css } from "@/styled-system/css";
-import { AnchorTextButton, HFlex, shortenAddress, TextButton, TokenIcon } from "@liquity2/uikit";
+import { AnchorTextButton, BOLD_TOKEN_SYMBOL, HFlex, shortenAddress, TextButton, TokenIcon } from "@liquity2/uikit";
 import { blo } from "blo";
 import Image from "next/image";
 import Link from "next/link";
 
-const DISPLAYED_PRICES = ["LQTY", "BOLD", "ETH"] as const;
+const DISPLAYED_PRICES = [
+  // "LQTY",
+  BOLD_TOKEN_SYMBOL,
+  "ETH"
+] as const;
 
 export function BottomBar() {
   const account = useAccount();
@@ -26,6 +30,7 @@ export function BottomBar() {
   return (
     <div
       className={css({
+        
         width: "100%",
         padding: "0 24px",
       })}
@@ -118,9 +123,9 @@ export function BottomBar() {
                   <HFlex gap={4} alignItems="center">
                     <TokenIcon
                       size={16}
-                      symbol="BOLD"
+                      symbol={BOLD_TOKEN_SYMBOL}
                     />
-                    Redeem BOLD
+                    Redeem {BOLD_TOKEN_SYMBOL}
                   </HFlex>
                 }
                 className={css({
