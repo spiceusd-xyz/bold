@@ -6,12 +6,20 @@ import type { ReactNode as N } from "react";
 export default {
   // Used in the top bar and other places
   appName: "Liquity V2",
+  appDescription: `
+    Liquity V2 is a new borrowing protocol that lets users
+    deposit ETH or LSTs as collateral and mint the stablecoin BOLD.
+  `,
+  appUrl: "https://www.liquity.org/",
+  appIcon: (
+    typeof window === "undefined" ? "" : window.location.origin
+  ) + "/favicon.svg",
 
   // Menu bar
   menu: {
     dashboard: "Dashboard",
     borrow: "Borrow",
-    leverage: "Leverage",
+    multiply: "Multiply",
     earn: "Earn",
     stake: "Stake",
   },
@@ -84,7 +92,7 @@ export default {
         </>
       ),
       footerLink: {
-        href: "https://github.com/liquity/bold#bold-redemptions",
+        href: "https://docs.liquity.org/v2-faq/redemptions-and-delegation",
         label: "Learn more",
       },
     },
@@ -115,7 +123,7 @@ export default {
     ],
     learnMore: {
       text: "Learn more about redemptions",
-      href: "https://github.com/liquity/bold#bold-redemptions",
+      href: "https://docs.liquity.org/v2-faq/redemptions-and-delegation",
     },
   },
 
@@ -130,11 +138,10 @@ export default {
         secondary: <>The interest rate is set and updated by a third party of your choice. They may charge a fee.</>,
       },
       strategy: {
-        label: "Automated (ICP)",
+        label: "Autonomous Rate Manager",
         secondary: (
           <>
-            The interest rate is set and updated by an automated strategy running on the decentralized Internet Computer
-            (ICP).
+            The interest rate is set and updated by an automated strategy running on the Internet Computer (ICP).
           </>
         ),
       },
@@ -143,13 +150,13 @@ export default {
     icStrategyModal: {
       title: (
         <>
-          Automated Strategies (<abbr title="Internet Computer">ICP</abbr>)
+          Autonomous Rate Manager (ARM)
         </>
       ),
       intro: (
         <>
           These strategies are run on the Internet Computer (ICP). They are automated and decentralized. More strategies
-          will be added over time.
+          may be added over time.
         </>
       ),
     },
@@ -165,6 +172,11 @@ export default {
   },
 
   closeLoan: {
+    claimOnly: (
+      <>
+        You are reclaiming your collateral and closing the position. The deposit will be returned to your wallet.
+      </>
+    ),
     repayWithBoldMessage: (
       <>
         You are repaying your debt and closing the position. The deposit will be returned to your wallet.
@@ -176,6 +188,8 @@ export default {
         will be returned to your wallet.
       </>
     ),
+    buttonRepayAndClose: "Repay & close",
+    buttonReclaimAndClose: "Reclaim & close",
   },
 
   // Home screen
@@ -184,20 +198,20 @@ export default {
     myPositionsTitle: "My positions",
     actions: {
       borrow: {
-        title: "Borrow BOLD",
-        description: "Set your own interest rate and borrow BOLD against ETH and staked ETH.",
+        title: "Borrow",
+        description: "Mint BOLD against your collateral at whatever interest rate you want",
       },
-      leverage: {
-        title: "Leverage ETH",
-        description: "Set your own interest rate and increase your exposure to ETH and staked ETH.",
+      multiply: {
+        title: "Multiply",
+        description: "Increase your exposure to ETH and its staking yield with a single click",
       },
       earn: {
         title: "Earn with BOLD",
-        description: "Cover liquidations to earn BOLD and collateral assets.",
+        description: "Deposit BOLD to earn protocol revenues and liquidation proceeds",
       },
       stake: {
         title: "Stake LQTY",
-        description: "Accrue voting power by staking your LQTY without a minimum lockup period.",
+        description: "Direct protocol incentives with LQTY while earning from Liquity V1",
       },
     },
     statsBar: {
@@ -249,11 +263,11 @@ export default {
     },
   },
 
-  // Leverage screen
+  // Multiply screen
   leverageScreen: {
     headline: (tokensIcons: N) => (
       <>
-        Leverage your exposure to {tokensIcons}
+        Multiply your exposure to {tokensIcons}
       </>
     ),
     depositField: {
@@ -268,7 +282,7 @@ export default {
     action: "Next: Summary",
     infoTooltips: {
       leverageLevel: [
-        "Leverage level",
+        "Multiply level",
         <>
           Choose the amplification of your exposure. Note that a higher level means higher liquidation risk. You are
           responsible for your own assessment of what a suitable level is.
@@ -297,10 +311,11 @@ export default {
     ),
     subheading: (
       <>
-        A BOLD deposit in a stability pool earns rewards from the fees that users pay on their loans. Also, in case the
-        system needs to liquidate positions, the BOLD may be swapped to collateral.
+        A BOLD deposit in a stability pool earns rewards from the fees that users pay on their loans. 
+        Also, the BOLD may be swapped to collateral in case the system needs to liquidate positions.
       </>
     ),
+    learnMore: ["https://docs.liquity.org/v2-faq/bold-and-earn", "Learn more"],
     poolsColumns: {
       pool: "Pool",
       apr: "APR",
@@ -337,13 +352,13 @@ export default {
       claim: "Claim rewards",
     },
     depositPanel: {
-      label: "Deposit",
+      label: "Increase deposit",
       shareLabel: "Pool share",
       claimCheckbox: "Claim rewards",
       action: "Next: Summary",
     },
     withdrawPanel: {
-      label: "Withdraw",
+      label: "Decrease deposit",
       claimCheckbox: "Claim rewards",
       action: "Next: Summary",
     },
@@ -436,7 +451,7 @@ export default {
       intro: (
         <>
           Direct incentives from Liquity V2 protocol revenues towards liquidity providers for BOLD. Upvote from Thursday
-          to Tuesday. Downvote all week. <Link href="https://github.com/liquity/V2-gov">Learn more</Link>
+          to Tuesday. Downvote all week. <Link href="https://docs.liquity.org/v2-faq/lqty-staking">Learn more</Link>
         </>
       ),
     },

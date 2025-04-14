@@ -10,18 +10,15 @@ import { CardRow, CardRows } from "./shared";
 
 export function PositionCardEarn({
   owner,
-  collIndex,
-  deposit,
+  branchId,
 }: Pick<
   PositionEarn,
   | "owner"
-  | "collIndex"
-  | "deposit"
+  | "branchId"
 >) {
-  const token = getCollToken(collIndex);
-  const earnPool = useEarnPool(collIndex);
-  const earnPosition = useEarnPosition(collIndex, owner ?? null);
-
+  const token = getCollToken(branchId);
+  const earnPool = useEarnPool(branchId);
+  const earnPosition = useEarnPosition(branchId, owner ?? null);
   return (
     <Link
       href={token ? `/earn/${token.symbol.toLowerCase()}` : ""}
@@ -54,7 +51,11 @@ export function PositionCardEarn({
         main={{
           value: (
             <HFlex gap={8} alignItems="center" justifyContent="flex-start">
-              <Amount value={deposit} format={2} />
+              <Amount
+                value={earnPosition.data?.deposit}
+                fallback="−"
+                format={2}
+              />
               <TokenIcon size="medium" symbol="BOLD" />
             </HFlex>
           ),
@@ -71,27 +72,59 @@ export function PositionCardEarn({
                 <div
                   className={css({
                     display: "flex",
-                    gap: 8,
+                    gap: 12,
                     fontSize: 14,
                   })}
                 >
                   <div
                     className={css({
-                      color: "positionContentAlt",
+                      display: "flex",
+                      gap: 8,
                     })}
                   >
-                    Current APR
+                    <div
+                      className={css({
+                        color: "positionContentAlt",
+                      })}
+                    >
+                      APR
+                    </div>
+                    <div
+                      className={css({
+                        color: "positionContent",
+                      })}
+                    >
+                      <Amount
+                        fallback="−"
+                        percentage
+                        value={earnPool.data?.apr}
+                      />
+                    </div>
                   </div>
                   <div
                     className={css({
-                      color: "positionContent",
+                      display: "flex",
+                      gap: 8,
                     })}
                   >
-                    <Amount
-                      fallback="−"
-                      percentage
-                      value={earnPool.data.apr}
-                    />
+                    <div
+                      className={css({
+                        color: "positionContentAlt",
+                      })}
+                    >
+                      7d APR
+                    </div>
+                    <div
+                      className={css({
+                        color: "positionContent",
+                      })}
+                    >
+                      <Amount
+                        fallback="−"
+                        percentage
+                        value={earnPool.data?.apr7d}
+                      />
+                    </div>
                   </div>
                 </div>
               }

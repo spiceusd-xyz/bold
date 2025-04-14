@@ -71,7 +71,7 @@ contract DevTestSetup is BaseTest {
         leverageZapperUniV3 = zappers.leverageZapperUniV3;
 
         // Give some Coll to test accounts, and approve it to BorrowerOperations
-        uint256 initialCollAmount = 1000_000e18;
+        uint256 initialCollAmount = 10_000_000_000e18;
         for (uint256 i = 0; i < 6; i++) {
             // A to F
             giveAndApproveColl(accountsList[i], initialCollAmount);
@@ -79,6 +79,7 @@ contract DevTestSetup is BaseTest {
 
         CCR = troveManager.get_CCR();
         MCR = troveManager.get_MCR();
+        BCR = troveManager.get_BCR();
         LIQUIDATION_PENALTY_SP = troveManager.get_LIQUIDATION_PENALTY_SP();
         LIQUIDATION_PENALTY_REDISTRIBUTION = troveManager.get_LIQUIDATION_PENALTY_REDISTRIBUTION();
     }
@@ -116,11 +117,14 @@ contract DevTestSetup is BaseTest {
         return (ATroveId, BTroveId, CTroveId);
     }
 
-    function _setupForBatchLiquidateTrovesPureOffset() internal returns (uint256, uint256, uint256, uint256) {
-        uint256 troveDebtRequest_A = 2200e18;
-        uint256 troveDebtRequest_B = 3200e18;
-        uint256 troveDebtRequest_C = 2450e18;
-        uint256 troveDebtRequest_D = 2450e18;
+    function _setupForBatchLiquidateTrovesPureOffset(uint256 _magnitude)
+        internal
+        returns (uint256, uint256, uint256, uint256)
+    {
+        uint256 troveDebtRequest_A = 2200e18 * _magnitude;
+        uint256 troveDebtRequest_B = 3200e18 * _magnitude;
+        uint256 troveDebtRequest_C = 2450e18 * _magnitude;
+        uint256 troveDebtRequest_D = 2450e18 * _magnitude;
         uint256 interestRate = 5e16; // 5%
 
         ABCDEF memory troveIDs;
@@ -128,10 +132,10 @@ contract DevTestSetup is BaseTest {
         uint256 price = 2000e18;
         priceFeed.setPrice(price);
 
-        troveIDs.A = openTroveNoHints100pct(A, 5 ether, troveDebtRequest_A, interestRate);
-        troveIDs.B = openTroveNoHints100pct(B, 5 ether, troveDebtRequest_B, interestRate);
-        troveIDs.C = openTroveNoHints100pct(C, 25e17, troveDebtRequest_C, interestRate);
-        troveIDs.D = openTroveNoHints100pct(D, 25e17, troveDebtRequest_D, interestRate);
+        troveIDs.A = openTroveNoHints100pct(A, 5 ether * _magnitude, troveDebtRequest_A, interestRate);
+        troveIDs.B = openTroveNoHints100pct(B, 5 ether * _magnitude, troveDebtRequest_B, interestRate);
+        troveIDs.C = openTroveNoHints100pct(C, 25e17 * _magnitude, troveDebtRequest_C, interestRate);
+        troveIDs.D = openTroveNoHints100pct(D, 25e17 * _magnitude, troveDebtRequest_D, interestRate);
 
         // A and B deposit to SP
         makeSPDepositAndClaim(A, troveDebtRequest_A);
@@ -149,7 +153,20 @@ contract DevTestSetup is BaseTest {
     }
 
     function _setupForSPDepositAdjustments() internal returns (ABCDEF memory troveIDs) {
-        (troveIDs.A, troveIDs.B, troveIDs.C, troveIDs.D) = _setupForBatchLiquidateTrovesPureOffset();
+        (troveIDs.A, troveIDs.B, troveIDs.C, troveIDs.D) = _setupForBatchLiquidateTrovesPureOffset(1);
+
+        // A liquidates C
+        liquidate(A, troveIDs.C);
+
+        // D sends BOLD to A and B so they have some to use in tests
+        transferBold(D, A, boldToken.balanceOf(D) / 2);
+        transferBold(D, B, boldToken.balanceOf(D));
+
+        assertEq(uint8(troveManager.getTroveStatus(troveIDs.C)), uint8(ITroveManager.Status.closedByLiquidation));
+    }
+
+    function _setupForSPDepositAdjustmentsBigTroves() internal returns (ABCDEF memory troveIDs) {
+        (troveIDs.A, troveIDs.B, troveIDs.C, troveIDs.D) = _setupForBatchLiquidateTrovesPureOffset(1e9);
 
         // A liquidates C
         liquidate(A, troveIDs.C);
@@ -162,7 +179,7 @@ contract DevTestSetup is BaseTest {
     }
 
     function _setupForSPDepositAdjustmentsWithoutOwedYieldRewards() internal returns (ABCDEF memory troveIDs) {
-        (troveIDs.A, troveIDs.B, troveIDs.C, troveIDs.D) = _setupForBatchLiquidateTrovesPureOffset();
+        (troveIDs.A, troveIDs.B, troveIDs.C, troveIDs.D) = _setupForBatchLiquidateTrovesPureOffset(1);
 
         // A claims yield rewards
         makeSPWithdrawalAndClaim(A, 0);
@@ -179,7 +196,7 @@ contract DevTestSetup is BaseTest {
 
     function _setupForPTests() internal returns (ABCDEF memory) {
         ABCDEF memory troveIDs;
-        (troveIDs.A, troveIDs.B, troveIDs.C, troveIDs.D) = _setupForBatchLiquidateTrovesPureOffset();
+        (troveIDs.A, troveIDs.B, troveIDs.C, troveIDs.D) = _setupForBatchLiquidateTrovesPureOffset(1);
         // B leaves so only A is in the pool
         makeSPWithdrawalAndClaim(B, stabilityPool.getCompoundedBoldDeposit(B));
         return troveIDs;
@@ -215,6 +232,13 @@ contract DevTestSetup is BaseTest {
         internal
         returns (uint256 coll, uint256 debtRequest, ABCDEF memory troveIDs)
     {
+        return _setupForRedemption(_troveInterestRates, false);
+    }
+
+    function _setupForRedemption(ABCDEF memory _troveInterestRates, bool _batched)
+        internal
+        returns (uint256 coll, uint256 debtRequest, ABCDEF memory troveIDs)
+    {
         priceFeed.setPrice(2000e18);
 
         // fast-forward to pass bootstrap phase
@@ -222,10 +246,17 @@ contract DevTestSetup is BaseTest {
 
         coll = 20 ether;
         debtRequest = 20200e18;
-        troveIDs.A = openTroveNoHints100pct(A, coll, debtRequest, _troveInterestRates.A);
-        troveIDs.B = openTroveNoHints100pct(B, coll, debtRequest, _troveInterestRates.B);
-        troveIDs.C = openTroveNoHints100pct(C, coll, debtRequest, _troveInterestRates.C);
-        troveIDs.D = openTroveNoHints100pct(D, coll, debtRequest, _troveInterestRates.D);
+        if (_batched) {
+            troveIDs.A = openTroveAndJoinBatchManager(A, coll, debtRequest, A, _troveInterestRates.A);
+            troveIDs.B = openTroveAndJoinBatchManager(B, coll, debtRequest, B, _troveInterestRates.B);
+            troveIDs.C = openTroveAndJoinBatchManager(C, coll, debtRequest, C, _troveInterestRates.C);
+            troveIDs.D = openTroveAndJoinBatchManager(D, coll, debtRequest, D, _troveInterestRates.D);
+        } else {
+            troveIDs.A = openTroveNoHints100pct(A, coll, debtRequest, _troveInterestRates.A);
+            troveIDs.B = openTroveNoHints100pct(B, coll, debtRequest, _troveInterestRates.B);
+            troveIDs.C = openTroveNoHints100pct(C, coll, debtRequest, _troveInterestRates.C);
+            troveIDs.D = openTroveNoHints100pct(D, coll, debtRequest, _troveInterestRates.D);
+        }
 
         // A, B, C, D transfer all their Bold to E
         transferBold(A, E, boldToken.balanceOf(A));
@@ -242,6 +273,16 @@ contract DevTestSetup is BaseTest {
         troveInterestRates.D = 4e17; // 40%
 
         return _setupForRedemption(troveInterestRates);
+    }
+
+    function _setupForRedemptionAscendingInterestInBatch() internal returns (uint256, uint256, ABCDEF memory) {
+        ABCDEF memory troveInterestRates;
+        troveInterestRates.A = 1e17; // 10%
+        troveInterestRates.B = 2e17; // 20%
+        troveInterestRates.C = 3e17; // 30%
+        troveInterestRates.D = 4e17; // 40%
+
+        return _setupForRedemption(troveInterestRates, true);
     }
 
     function _redeemAndCreateZombieTrovesAAndB(ABCDEF memory _troveIDs) internal {

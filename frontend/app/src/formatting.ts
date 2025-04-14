@@ -1,29 +1,53 @@
 import type { Dnum, RiskLevel } from "@/src/types";
 
+import { ONE_DAY, ONE_HOUR, ONE_MINUTE, ONE_SECOND } from "@/src/constants";
 import { DNUM_0, DNUM_1 } from "@/src/dnum-utils";
 import * as dn from "dnum";
 import { match, P } from "ts-pattern";
 
-// Dnum formatting options
-const dnFormatOptions = {
+// formatting presets
+const fmtnumPresets = {
   "1z": { digits: 1, trailingZeros: true },
   "2z": { digits: 2, trailingZeros: true },
+  "12z": { digits: 12, trailingZeros: true },
   "2diff": { digits: 2, signDisplay: "exceptZero" },
   "4diff": { digits: 4, signDisplay: "exceptZero" },
+  "pct1z": { scale: 100, digits: 1, trailingZeros: true },
+  "pct2": { scale: 100, digits: 2 },
+  "pct2z": { scale: 100, digits: 2, trailingZeros: true },
+  "pctfull": { scale: 100, digits: undefined },
   "compact": { compact: true, digits: 2 },
-  "full": undefined, // dnum defaults
-} as const;
+  "full": {},
+} satisfies Record<
+  string,
+  Exclude<DnumFormatOptions, number> & FmtnumExclusiveOptions
+>;
 
-function isDnFormatName(value: unknown): value is keyof typeof dnFormatOptions {
-  return typeof value === "string" && value in dnFormatOptions;
+type DnumFormatOptions =
+  | number
+  | Parameters<typeof dn.format>[1];
+
+export type FmtnumPresetName = keyof typeof fmtnumPresets;
+
+export type FmtnumExclusiveOptions = {
+  dust?: boolean;
+  prefix?: string;
+  preset?: FmtnumPresetName;
+  scale?: number; // pass e.g. 100 to format as percentage
+  suffix?: string;
+};
+
+export type FmtnumOptions =
+  | FmtnumPresetName // alias for { preset: FmtnumPresetName }
+  | (DnumFormatOptions & FmtnumExclusiveOptions);
+
+function isFmtnumPresetName(value: unknown): value is FmtnumPresetName {
+  return typeof value === "string" && value in fmtnumPresets;
 }
 
 export function fmtnum(
   value: Dnum | number | null | undefined,
-  optionsOrFormatName:
-    | keyof typeof dnFormatOptions
-    | Parameters<typeof dn.format>[1] = "2z",
-  scale = 1, // pass 100 here to format as percentage
+  optionsOrPreset: FmtnumOptions = "2z",
 ) {
   if (value === null || value === undefined) {
     return "";
@@ -31,24 +55,58 @@ export function fmtnum(
   if (typeof value === "number") {
     value = dn.from(value);
   }
-  if (scale > 1) {
+
+  // resolve alias for options.digits
+  if (typeof optionsOrPreset === "number") {
+    optionsOrPreset = { digits: optionsOrPreset };
+  }
+
+  // resolve alias for options.preset
+  if (isFmtnumPresetName(optionsOrPreset)) {
+    optionsOrPreset = { preset: optionsOrPreset };
+  }
+
+  // apply options.preset
+  if (optionsOrPreset.preset) {
+    optionsOrPreset = {
+      ...fmtnumPresets[optionsOrPreset.preset],
+      ...optionsOrPreset,
+    };
+  }
+
+  const {
+    dust = true,
+    prefix = "",
+    preset,
+    scale = 1,
+    suffix = "",
+    ...dnOptions
+  } = optionsOrPreset;
+
+  // apply scale
+  if (scale !== 1) {
     value = dn.mul(value, scale);
   }
 
-  const options: Exclude<Parameters<typeof dn.format>[1], number> = isDnFormatName(optionsOrFormatName)
-    ? dnFormatOptions[optionsOrFormatName]
-    : optionsOrFormatName;
+  const formatted = dn.format(value, {
+    ...dnOptions,
+    locale: "en-US",
+  });
 
-  const formatted = dn.format(value, options);
-
-  // replace values rounded to 0.0…0 with 0.0…1 so they don't look like 0
-  if (typeof options?.digits === "number" && options.digits > 0 && value[0] > 0n) {
-    if (formatted === `0.${"0".repeat(options.digits)}`) {
-      return `0.${"0".repeat(options.digits - 1)}1`;
-    }
+  // show eg. 0.0001 as <0.01 rather than 0.00
+  if (
+    dust
+    && dnOptions.signDisplay === undefined // don’t use with +- signs
+    && dnOptions.digits !== undefined // don’t use with full precision
+    && dnOptions.compact !== true // don’t use with compact
+    && dnOptions.digits > 0 // no dust for integers
+    && value[0] > 0n // only positive numbers
+    && (formatted === "0" || formatted === `0.${"0".repeat(dnOptions.digits)}`)
+  ) {
+    return `<${prefix}0.${"0".repeat(dnOptions.digits - 1)}1${suffix}`;
   }
 
-  return formatted;
+  return prefix + formatted + suffix;
 }
 
 export function formatLiquidationRisk(liquidationRisk: RiskLevel | null) {
@@ -125,4 +183,63 @@ export function formatPercentage(
       trailingZeros,
     })
   }%`;
+}
+
+export function formatDate(date: Date, format: "full" | "iso" = "full") {
+  if (format === "full") {
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "numeric",
+      minute: "numeric",
+    });
+  }
+  if (format === "iso") {
+    return date.toISOString();
+  }
+  throw new Error(`Invalid date format: ${format}`);
+}
+
+const relativeTimeFormat = new Intl.RelativeTimeFormat(
+  "en-US",
+  { numeric: "auto" },
+);
+
+const relativeTimeUnits = [
+  [ONE_DAY, "days"],
+  [ONE_HOUR, "hours"],
+  [ONE_MINUTE, "minutes"],
+  [ONE_SECOND, "seconds"],
+] as const;
+
+export function formatRelativeTime(duration: number | bigint) {
+  duration = Number(duration);
+
+  for (const [threshold, unit] of relativeTimeUnits) {
+    if (Math.abs(duration) >= threshold) {
+      return relativeTimeFormat.format(
+        Math.ceil(duration / threshold),
+        unit,
+      );
+    }
+  }
+
+  return "just now";
+}
+
+export function formatDuration(durationInSeconds: number | bigint) {
+  durationInSeconds = Number(durationInSeconds);
+
+  const seconds = durationInSeconds % 60;
+  const minutes = Math.floor(durationInSeconds / 60) % 60;
+  const hours = Math.floor(durationInSeconds / (60 * 60)) % 24;
+  const days = Math.floor(durationInSeconds / (60 * 60 * 24));
+
+  return [
+    days ? `${days}d` : null,
+    hours ? `${hours}h` : null,
+    minutes ? `${minutes}m` : null,
+    seconds ? `${seconds}s` : null,
+  ].filter(Boolean).join(" ");
 }

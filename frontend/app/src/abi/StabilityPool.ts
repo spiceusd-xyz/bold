@@ -142,14 +142,14 @@ export const StabilityPool = [
   },
   {
     "type": "function",
-    "name": "getEntireSystemColl",
+    "name": "getEntireBranchColl",
     "inputs": [],
     "outputs": [{ "name": "entireSystemColl", "type": "uint256", "internalType": "uint256" }],
     "stateMutability": "view",
   },
   {
     "type": "function",
-    "name": "getEntireSystemDebt",
+    "name": "getEntireBranchDebt",
     "inputs": [],
     "outputs": [{ "name": "entireSystemDebt", "type": "uint256", "internalType": "uint256" }],
     "stateMutability": "view",
@@ -177,7 +177,7 @@ export const StabilityPool = [
   },
   {
     "type": "function",
-    "name": "lastBoldLossError_Offset",
+    "name": "lastBoldLossErrorByP_Offset",
     "inputs": [],
     "outputs": [{ "name": "", "type": "uint256", "internalType": "uint256" }],
     "stateMutability": "view",

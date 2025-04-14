@@ -59,8 +59,7 @@ export function LeverageField({
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            width: 300,
-            marginRight: -20,
+            width: 260,
           }}
         >
           <Slider
@@ -90,7 +89,7 @@ export function LeverageField({
                     fontVariantNumeric: "tabular-nums",
                   })}
                 >
-                  {dn.format(debt, { digits: 2, trailingZeros: true })}
+                  {fmtnum(debt)}
                 </span>
                 {" BOLD"}
               </>
@@ -109,13 +108,13 @@ export function LeverageField({
                 color: "content",
               })}
             >
-              ${fmtnum(collPrice, "2z")}
+              {fmtnum(collPrice, { preset: "2z", prefix: "$" })}
             </span>
           </span>
         ),
         end: (
           <HFlex gap={8}>
-            Leverage {
+            Multiply {
               <span
                 style={{
                   color: liquidationRisk === "high"
@@ -170,6 +169,10 @@ export function useLeverageField({
   const maxLtvAllowed = dn.mul(maxLtv, maxLtvAllowedRatio);
   const maxLeverageFactorAllowed = getLeverageFactorFromLtv(maxLtvAllowed);
 
+  if (!LEVERAGE_FACTOR_SUGGESTIONS[0]) {
+    throw new Error("LEVERAGE_FACTOR_SUGGESTIONS must have at least one suggestion set");
+  }
+
   const [leverageFactor, setLeverageFactor] = useState(
     getLeverageFactorFromRatio(
       LEVERAGE_FACTOR_MIN,
@@ -188,7 +191,7 @@ export function useLeverageField({
   const liquidationPriceBoundaries = [
     getLiquidationPriceFromLeverage(LEVERAGE_FACTOR_MIN, collPrice, collateralRatio),
     getLiquidationPriceFromLeverage(maxLeverageFactor, collPrice, collateralRatio),
-  ];
+  ] as const;
 
   const deposit = depositPreLeverage && leverageFactor > 1
     ? dn.mul(depositPreLeverage, leverageFactor)
@@ -225,7 +228,7 @@ export function useLeverageField({
   }, [maxLeverageFactor]);
 
   const liquidationPriceField = useInputFieldValue(
-    (value) => `$ ${dn.format(value, { digits: 2, trailingZeros: true })}`,
+    (value) => fmtnum(value, { dust: false, prefix: "$ ", preset: "2z" }),
     {
       onChange: ({ parsed: liquidationPrice, focused }) => {
         if (liquidationPrice && dn.gt(liquidationPrice, 0) && liquidationPriceField.isFocused && focused) {

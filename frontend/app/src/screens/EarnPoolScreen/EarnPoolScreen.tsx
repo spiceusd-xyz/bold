@@ -5,8 +5,8 @@ import { Screen } from "@/src/comps/Screen/Screen";
 import { ScreenCard } from "@/src/comps/Screen/ScreenCard";
 import { Spinner } from "@/src/comps/Spinner/Spinner";
 import content from "@/src/content";
-import { getCollIndexFromSymbol, useEarnPool, useEarnPosition } from "@/src/liquity-utils";
-import { useAccount } from "@/src/services/Ethereum";
+import { getBranch, getCollToken, isEarnPositionActive, useEarnPool, useEarnPosition } from "@/src/liquity-utils";
+import { useAccount } from "@/src/wagmi-utils";
 import { css } from "@/styled-system/css";
 import { HFlex, IconEarn, isCollateralSymbol, Tabs } from "@liquity2/uikit";
 import { a, useTransition } from "@react-spring/web";
@@ -22,23 +22,29 @@ const TABS = [
 ] as const;
 
 export function EarnPoolScreen() {
-  const router = useRouter();
   const params = useParams();
 
-  const account = useAccount();
-
   const collateralSymbol = String(params.pool).toUpperCase();
-  const isCollSymbolOk = isCollateralSymbol(collateralSymbol);
-  const collIndex = getCollIndexFromSymbol(isCollSymbolOk ? collateralSymbol : null);
-
-  const earnPosition = useEarnPosition(collIndex, account.address ?? null);
-  const earnPool = useEarnPool(collIndex);
-
-  const hasDeposit = earnPosition.data?.deposit && dn.gt(earnPosition.data.deposit, 0);
+  if (!isCollateralSymbol(collateralSymbol)) {
+    throw new Error("Invalid collateral symbol");
+  }
 
   const tab = TABS.find((tab) => tab.action === params.action) ?? TABS[0];
+  if (!tab) {
+    throw new Error("Invalid tab action: " + params.action);
+  }
 
-  const loadingState = earnPool.isLoading || earnPosition.isLoading ? "loading" : "success";
+  const router = useRouter();
+  const account = useAccount();
+
+  const branch = getBranch(collateralSymbol);
+  const collToken = getCollToken(branch.id);
+  const earnPosition = useEarnPosition(branch.id, account.address ?? null);
+  const earnPool = useEarnPool(branch.id);
+
+  const active = isEarnPositionActive(earnPosition.data ?? null);
+
+  const loadingState = earnPool.isLoading || earnPosition.status === "pending" ? "loading" : "success";
 
   const tabsTransition = useTransition(loadingState, {
     from: { opacity: 0 },
@@ -51,11 +57,7 @@ export function EarnPoolScreen() {
     },
   });
 
-  if (collIndex === null || !isCollSymbolOk) {
-    return null;
-  }
-
-  return earnPool.data && tab && (
+  return (
     <Screen
       ready={loadingState === "success"}
       back={{
@@ -74,8 +76,8 @@ export function EarnPoolScreen() {
           {loadingState === "success"
             ? (
               <EarnPositionSummary
-                earnPosition={earnPosition.data}
-                collIndex={collIndex}
+                earnPosition={earnPosition.data ?? null}
+                branchId={branch.id}
               />
             )
             : (
@@ -100,14 +102,11 @@ export function EarnPoolScreen() {
                   >
                     <IconEarn size={16} />
                   </div>
-                  <div>
-                    Earn Pool
-                  </div>
+                  <HFlex gap={8}>
+                    Fetching {collToken.name} Stability Pool…
+                    <Spinner size={18} />
+                  </HFlex>
                 </div>
-                <HFlex gap={8}>
-                  Fetching {earnPool.data.collateral?.name} Stability Pool…
-                  <Spinner size={18} />
-                </HFlex>
               </>
             )}
         </ScreenCard>
@@ -129,12 +128,16 @@ export function EarnPoolScreen() {
               opacity: style.opacity,
             }}
           >
-            {hasDeposit
+            {active
               ? (
                 <Tabs
                   selected={TABS.indexOf(tab)}
                   onSelect={(index) => {
-                    router.push(`/earn/${collateralSymbol.toLowerCase()}/${TABS[index].action}`, {
+                    const tab = TABS[index];
+                    if (!tab) {
+                      throw new Error("Invalid tab index");
+                    }
+                    router.push(`/earn/${collateralSymbol.toLowerCase()}/${tab.action}`, {
                       scroll: false,
                     });
                   }}
@@ -146,24 +149,25 @@ export function EarnPoolScreen() {
                 />
               )
               : (
-                <h1
+                <p
                   className={css({
-                    fontSize: 24,
+                    fontSize: 18,
+                    textAlign: "center",
                   })}
                 >
-                  New Stability Pool deposit
-                </h1>
+                  Stability Pool (“Earn”) deposits are disabled, see top banner.
+                </p>
               )}
-            {tab.action === "deposit" && (
+            {tab.action === "deposit" && active && (
               <PanelUpdateDeposit
-                collIndex={collIndex}
-                deposited={earnPool.data.totalDeposited ?? dn.from(0, 18)}
+                branchId={branch.id}
+                deposited={earnPool.data?.totalDeposited ?? dn.from(0, 18)}
                 position={earnPosition.data ?? undefined}
               />
             )}
             {tab.action === "claim" && (
               <PanelClaimRewards
-                collIndex={collIndex}
+                branchId={branch.id}
                 position={earnPosition.data ?? undefined}
               />
             )}

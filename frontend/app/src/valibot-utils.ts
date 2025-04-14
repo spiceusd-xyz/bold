@@ -3,9 +3,15 @@ import type { Address } from "@liquity2/uikit";
 import type { Dnum } from "dnum";
 
 import { isPrefixedtroveId, isTroveId } from "@/src/types";
-import { isAddress } from "@liquity2/uikit";
 import { isDnum } from "dnum";
 import * as v from "valibot";
+
+// this is duplicated from the UI kit rather than being imported,
+// to make valibot-utils.ts RSC-compatible.
+const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
+function isAddress(address: unknown): address is Address {
+  return typeof address === "string" && ADDRESS_RE.test(address);
+}
 
 export function vAddress() {
   return v.custom<Address>(isAddress, "not a valid Ethereum address");
@@ -22,7 +28,7 @@ export function vDnum() {
   return v.custom<Dnum>(isDnum, "not a Dnum");
 }
 
-export function vCollIndex() {
+export function vBranchId() {
   return v.union([
     v.literal(0),
     v.literal(1),
@@ -53,17 +59,45 @@ export function vPrefixedTroveId() {
   );
 }
 
+// accepts a URL or a vEnvFlag to use the default or disable
+export function vEnvUrlOrDefault(defaultValue: `https://${string}`) {
+  return v.pipe(
+    // true = use default
+    // false = disable
+    // string = custom URL
+    v.optional(
+      v.union([
+        v.pipe(v.string(), v.url()),
+        vEnvFlag(),
+      ]),
+      "true",
+    ),
+    v.transform((value) => {
+      if (typeof value === "string") {
+        if (value.startsWith("https://")) {
+          return value;
+        }
+        throw new Error(`URL must start with "https://", got "${value}"`);
+      }
+      return value ? defaultValue : null;
+    }),
+  );
+}
+
 // Env var link, e.g. Etherscan|https://etherscan.io
-export function vEnvLink() {
+export function vEnvLink(addFinalSlash = false) {
   return v.pipe(
     v.string(),
     v.trim(),
     v.regex(/^[^|]+\|https?:\/\/[^|]+$/),
-    v.transform<
-      string,
-      { name: string; url: string }
-    >((value) => {
-      const [name, url] = value.split("|");
+    v.transform<string, {
+      name: string;
+      url: string;
+    }>((value) => {
+      let [name, url] = value.split("|") as [string, string];
+      if (addFinalSlash && !url.endsWith("/")) {
+        url += "/";
+      }
       return { name, url };
     }),
   );
@@ -95,7 +129,7 @@ export function vEnvAddressAndBlock() {
       string,
       { address: Address; blockCreated?: number }
     >((value) => {
-      const [address, block] = value.split("|");
+      const [address, block] = value.split("|") as [string, string];
       const parsedBlock = parseInt(block, 10);
       if (!isAddress(address)) {
         throw new Error(`${address} is not a valid Ethereum address`);
@@ -118,7 +152,7 @@ export function vEnvCurrency() {
       string,
       { decimals: number; name: string; symbol: string }
     >((value) => {
-      const [name, symbol, decimals] = value.split("|");
+      const [name, symbol, decimals] = value.split("|") as [string, string, string];
       return {
         decimals: parseInt(decimals, 10),
         name,
@@ -133,7 +167,6 @@ export function vPositionStake() {
     type: v.literal("stake"),
     owner: vAddress(),
     deposit: vDnum(),
-    share: vDnum(),
     totalStaked: vDnum(),
     rewards: v.object({
       lusd: vDnum(),
@@ -145,12 +178,12 @@ export function vPositionStake() {
 const VPositionLoanBase = v.object({
   type: v.union([
     v.literal("borrow"),
-    v.literal("leverage"),
+    v.literal("multiply"),
   ]),
   batchManager: v.union([v.null(), vAddress()]),
   borrowed: vDnum(),
   borrower: vAddress(),
-  collIndex: vCollIndex(),
+  branchId: vBranchId(),
   deposit: vDnum(),
   interestRate: vDnum(),
   status: v.union([
@@ -166,7 +199,6 @@ export function vPositionLoanCommited() {
     VPositionLoanBase,
     v.object({
       troveId: vTroveId(),
-      updatedAt: v.number(),
       createdAt: v.number(),
     }),
   ]);
@@ -192,11 +224,37 @@ export function vPositionEarn() {
   return v.object({
     type: v.literal("earn"),
     owner: vAddress(),
-    collIndex: vCollIndex(),
+    branchId: vBranchId(),
     deposit: vDnum(),
     rewards: v.object({
       bold: vDnum(),
       coll: vDnum(),
     }),
   });
+}
+
+export function vVote() {
+  return v.union([
+    v.literal("for"),
+    v.literal("against"),
+  ]);
+}
+
+export function vVoteAllocation() {
+  return v.object({
+    vote: v.union([v.null(), vVote()]),
+    value: vDnum(),
+  });
+}
+
+export function vVoteAllocations() {
+  return v.record(vAddress(), vVoteAllocation());
+}
+
+export function vCollateralSymbol() {
+  return v.union([
+    v.literal("ETH"),
+    v.literal("RETH"),
+    v.literal("WSTETH"),
+  ]);
 }

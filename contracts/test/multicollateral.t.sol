@@ -67,10 +67,10 @@ contract MulticollateralTest is DevTestSetup {
 
         TestDeployer.TroveManagerParams[] memory troveManagerParamsArray =
             new TestDeployer.TroveManagerParams[](NUM_COLLATERALS);
-        troveManagerParamsArray[0] = TestDeployer.TroveManagerParams(150e16, 110e16, 110e16, 5e16, 10e16);
-        troveManagerParamsArray[1] = TestDeployer.TroveManagerParams(160e16, 120e16, 120e16, 5e16, 10e16);
-        troveManagerParamsArray[2] = TestDeployer.TroveManagerParams(160e16, 120e16, 120e16, 5e16, 10e16);
-        troveManagerParamsArray[3] = TestDeployer.TroveManagerParams(160e16, 125e16, 125e16, 5e16, 10e16);
+        troveManagerParamsArray[0] = TestDeployer.TroveManagerParams(150e16, 110e16, 10e16, 110e16, 5e16, 10e16);
+        troveManagerParamsArray[1] = TestDeployer.TroveManagerParams(160e16, 120e16, 10e16, 120e16, 5e16, 10e16);
+        troveManagerParamsArray[2] = TestDeployer.TroveManagerParams(160e16, 120e16, 10e16, 120e16, 5e16, 10e16);
+        troveManagerParamsArray[3] = TestDeployer.TroveManagerParams(160e16, 125e16, 10e16, 125e16, 5e16, 10e16);
 
         TestDeployer deployer = new TestDeployer();
         TestDeployer.LiquityContractsDev[] memory _contractsArray;
@@ -110,7 +110,7 @@ contract MulticollateralTest is DevTestSetup {
         }
     }
 
-    function testMultiCollateralDeployment() public view {
+    function testMultiCollateralDeployment() public {
         // check deployment
         assertEq(collateralRegistry.totalCollaterals(), NUM_COLLATERALS, "Wrong number of branches");
         for (uint256 c = 0; c < NUM_COLLATERALS; c++) {
@@ -121,6 +121,11 @@ contract MulticollateralTest is DevTestSetup {
             assertEq(address(collateralRegistry.getToken(c)), ZERO_ADDRESS, "Extra collateral token");
             assertEq(address(collateralRegistry.getTroveManager(c)), ZERO_ADDRESS, "Extra TroveManager");
         }
+        // reverts for invalid index
+        vm.expectRevert("Invalid index");
+        collateralRegistry.getToken(10);
+        vm.expectRevert("Invalid index");
+        collateralRegistry.getTroveManager(10);
     }
 
     struct TestValues {
@@ -161,8 +166,10 @@ contract MulticollateralTest is DevTestSetup {
         testValues4.troveId = openMulticollateralTroveNoHints100pctWithIndex(3, A, 0, 10e18, 10000e18, 5e16);
         makeMulticollateralSPDepositAndClaim(3, A, 10000e18);
 
+        // let time go by to reduce redemption rate (/16)
+        vm.warp(block.timestamp + 1 days);
+
         // Check A’s final bal
-        // TODO: change when we switch to new gas compensation
         assertEq(boldToken.balanceOf(A), 16000e18, "Wrong Bold balance before redemption");
 
         // initial balances
@@ -195,11 +202,28 @@ contract MulticollateralTest is DevTestSetup {
         testValues3.fee = fee * testValues3.redeemAmount / redeemAmount * DECIMAL_PRECISION / testValues3.price;
         testValues4.fee = fee * testValues4.redeemAmount / redeemAmount * DECIMAL_PRECISION / testValues4.price;
 
+        // Check redemption rate
+        assertApproxEqAbs(
+            collateralRegistry.getRedemptionFeeWithDecay(redeemAmount),
+            redeemAmount * (INITIAL_BASE_RATE / 16 + REDEMPTION_FEE_FLOOR) / DECIMAL_PRECISION,
+            1e7,
+            "Wrong redemption fee with decay"
+        );
+
+        uint256 initialBoldSupply = boldToken.totalSupply();
+
         // A redeems 1.6k
         redeem(A, redeemAmount);
 
+        // Check redemption rate
+        assertApproxEqAbs(
+            collateralRegistry.getRedemptionRate(),
+            INITIAL_BASE_RATE / 16 + REDEMPTION_FEE_FLOOR + redeemAmount * DECIMAL_PRECISION / initialBoldSupply,
+            1e5,
+            "Wrong redemption rate"
+        );
+
         // Check bold balance
-        // TODO: change when we switch to new gas compensation
         assertApproxEqAbs(boldToken.balanceOf(A), 14400e18, 10, "Wrong Bold balance after redemption");
 
         // Check collateral balances
@@ -319,10 +343,10 @@ contract MulticollateralTest is DevTestSetup {
         testValues3.collInitialBalance = contractsArray[2].collToken.balanceOf(A);
         testValues4.collInitialBalance = contractsArray[3].collToken.balanceOf(A);
 
-        testValues1.unbackedPortion = contractsArray[0].troveManager.getEntireSystemDebt() - _spBoldAmount1;
-        testValues2.unbackedPortion = contractsArray[1].troveManager.getEntireSystemDebt() - _spBoldAmount2;
-        testValues3.unbackedPortion = contractsArray[2].troveManager.getEntireSystemDebt() - _spBoldAmount3;
-        testValues4.unbackedPortion = contractsArray[3].troveManager.getEntireSystemDebt() - _spBoldAmount4;
+        testValues1.unbackedPortion = contractsArray[0].troveManager.getEntireBranchDebt() - _spBoldAmount1;
+        testValues2.unbackedPortion = contractsArray[1].troveManager.getEntireBranchDebt() - _spBoldAmount2;
+        testValues3.unbackedPortion = contractsArray[2].troveManager.getEntireBranchDebt() - _spBoldAmount3;
+        testValues4.unbackedPortion = contractsArray[3].troveManager.getEntireBranchDebt() - _spBoldAmount4;
         uint256 totalUnbacked = testValues1.unbackedPortion + testValues2.unbackedPortion + testValues3.unbackedPortion
             + testValues4.unbackedPortion;
 
@@ -431,10 +455,10 @@ contract MulticollateralTest is DevTestSetup {
         assertGt(expectedFeePct, 0);
 
         // Get BOLD debts from each branch
-        testValues0.branchDebt = contractsArray[0].troveManager.getEntireSystemDebt();
-        testValues1.branchDebt = contractsArray[1].troveManager.getEntireSystemDebt();
-        testValues2.branchDebt = contractsArray[2].troveManager.getEntireSystemDebt();
-        testValues3.branchDebt = contractsArray[3].troveManager.getEntireSystemDebt();
+        testValues0.branchDebt = contractsArray[0].troveManager.getEntireBranchDebt();
+        testValues1.branchDebt = contractsArray[1].troveManager.getEntireBranchDebt();
+        testValues2.branchDebt = contractsArray[2].troveManager.getEntireBranchDebt();
+        testValues3.branchDebt = contractsArray[3].troveManager.getEntireBranchDebt();
 
         testValues0.collTokenBalBefore_A = contractsArray[0].collToken.balanceOf(A);
         testValues1.collTokenBalBefore_A = contractsArray[1].collToken.balanceOf(A);
@@ -445,10 +469,10 @@ contract MulticollateralTest is DevTestSetup {
         redeem(A, redeemAmount);
 
         // Check how much BOLD was redeemed from each branch
-        testValues0.redeemed = testValues0.branchDebt - contractsArray[0].troveManager.getEntireSystemDebt();
-        testValues1.redeemed = testValues1.branchDebt - contractsArray[1].troveManager.getEntireSystemDebt();
-        testValues2.redeemed = testValues2.branchDebt - contractsArray[2].troveManager.getEntireSystemDebt();
-        testValues3.redeemed = testValues3.branchDebt - contractsArray[3].troveManager.getEntireSystemDebt();
+        testValues0.redeemed = testValues0.branchDebt - contractsArray[0].troveManager.getEntireBranchDebt();
+        testValues1.redeemed = testValues1.branchDebt - contractsArray[1].troveManager.getEntireBranchDebt();
+        testValues2.redeemed = testValues2.branchDebt - contractsArray[2].troveManager.getEntireBranchDebt();
+        testValues3.redeemed = testValues3.branchDebt - contractsArray[3].troveManager.getEntireBranchDebt();
 
         assertGt(testValues0.redeemed, 0);
         assertGt(testValues1.redeemed, 0);

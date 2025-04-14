@@ -27,10 +27,10 @@ contract ShutdownTest is DevTestSetup {
 
         TestDeployer.TroveManagerParams[] memory troveManagerParamsArray =
             new TestDeployer.TroveManagerParams[](NUM_COLLATERALS);
-        troveManagerParamsArray[0] = TestDeployer.TroveManagerParams(150e16, 110e16, 110e16, 5e16, 10e16);
-        troveManagerParamsArray[1] = TestDeployer.TroveManagerParams(160e16, 120e16, 120e16, 5e16, 10e16);
-        troveManagerParamsArray[2] = TestDeployer.TroveManagerParams(160e16, 120e16, 120e16, 5e16, 10e16);
-        troveManagerParamsArray[3] = TestDeployer.TroveManagerParams(160e16, 125e16, 125e16, 5e16, 10e16);
+        troveManagerParamsArray[0] = TestDeployer.TroveManagerParams(150e16, 110e16, 10e16, 110e16, 5e16, 10e16);
+        troveManagerParamsArray[1] = TestDeployer.TroveManagerParams(160e16, 120e16, 10e16, 120e16, 5e16, 10e16);
+        troveManagerParamsArray[2] = TestDeployer.TroveManagerParams(160e16, 120e16, 10e16, 120e16, 5e16, 10e16);
+        troveManagerParamsArray[3] = TestDeployer.TroveManagerParams(160e16, 125e16, 10e16, 125e16, 5e16, 10e16);
 
         TestDeployer deployer = new TestDeployer();
         TestDeployer.LiquityContractsDev[] memory _contractsArray;
@@ -371,8 +371,25 @@ contract ShutdownTest is DevTestSetup {
     function testCannotUrgentRedeemZero() public {
         uint256 troveId = prepareAndShutdownFirstBranch();
 
+        vm.startPrank(A);
         vm.expectRevert(TroveManager.ZeroAmount.selector);
         troveManager.urgentRedemption(0, uintToArray(troveId), 0);
+        vm.stopPrank();
+    }
+
+    function testCannotUrgentRedeemWithoutEnoughBalance() public {
+        uint256 troveId = prepareAndShutdownFirstBranch();
+
+        // A sends 900 Bold to B
+        vm.startPrank(A);
+        boldToken.transfer(B, 900e18);
+        vm.stopPrank();
+
+        // B tries to redeem 1000 Bold
+        vm.startPrank(B);
+        vm.expectRevert(TroveManager.NotEnoughBoldBalance.selector);
+        troveManager.urgentRedemption(1000e18, uintToArray(troveId), 0);
+        vm.stopPrank();
     }
 
     function testUrgentRedeemRevertsIfMinNotReached() public {

@@ -467,6 +467,32 @@ contract Redemptions is DevTestSetup {
         assertEq(troveManager.lastZombieTroveId(), 0, "Wrong last zombie trove pointer after");
     }
 
+    function testZombieTrovePointerGetsResetIfTroveIsClosedFromABatch() public {
+        (,, ABCDEF memory troveIDs) = _setupForRedemptionAscendingInterestInBatch();
+
+        _redeemAndCreateZombieTrovesAAndB(troveIDs);
+
+        // Check last Zombie trove pointer
+        assertEq(troveManager.lastZombieTroveId(), troveIDs.B, "Wrong last zombie trove pointer before");
+
+        // Get B debt before 2nd redeem
+        uint256 debt_B = troveManager.getTroveEntireDebt(troveIDs.B);
+        assertGt(debt_B, 0, "B debt should be non zero");
+
+        deal(address(boldToken), B, debt_B);
+        closeTrove(B, troveIDs.B);
+
+        // Check B is closed
+        assertEq(
+            uint8(troveManager.getTroveStatus(troveIDs.B)),
+            uint8(ITroveManager.Status.closedByOwner),
+            "B trove should be closed"
+        );
+
+        // Check last Zombie trove pointer
+        assertEq(troveManager.lastZombieTroveId(), 0, "Wrong last zombie trove pointer after");
+    }
+
     function testZombieTrovePointerGetsResetIfTroveIsLiquidated() public {
         (,, ABCDEF memory troveIDs) = _setupForRedemptionAscendingInterest();
 
@@ -1023,6 +1049,35 @@ contract Redemptions is DevTestSetup {
             (ARecordedDebt + BRecordedDebt) * MIN_ANNUAL_INTEREST_RATE / DECIMAL_PRECISION,
             1,
             "Pending debt mismatch"
+        );
+    }
+
+    function testBaseRateDecayCannotBeSlowedDown() external {
+        openTroveHelper({
+            _account: A,
+            _index: 0,
+            _coll: 1e4 ether,
+            _boldAmount: 1e6 ether,
+            _annualInterestRate: MIN_ANNUAL_INTEREST_RATE
+        });
+
+        uint256 initialBaseRate = collateralRegistry.baseRate();
+
+        for (uint256 i = 0; i < 60; ++i) {
+            skip(2 minutes - 1 seconds);
+            redeem(A, 1 wei);
+        }
+
+        uint256 finalBaseRate = collateralRegistry.baseRate();
+
+        // In total, 119 minutes have passed, so we expect base rate to have
+        // decayed to REDEMPTION_MINUTE_DECAY_FACTOR^119 of its original value
+        assertApproxEqAbsDecimal(
+            finalBaseRate,
+            initialBaseRate * LiquityMath._decPow(REDEMPTION_MINUTE_DECAY_FACTOR, 119) / DECIMAL_PRECISION,
+            100,
+            18,
+            "wrong final base rate"
         );
     }
 

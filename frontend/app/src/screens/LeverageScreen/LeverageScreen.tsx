@@ -5,39 +5,29 @@ import type { Address, Dnum, PositionLoanUncommitted } from "@/src/types";
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
 
 import { Amount } from "@/src/comps/Amount/Amount";
-import { ConnectWarningBox } from "@/src/comps/ConnectWarningBox/ConnectWarningBox";
+// import { ConnectWarningBox } from "@/src/comps/ConnectWarningBox/ConnectWarningBox";
 import { Field } from "@/src/comps/Field/Field";
 import { InterestRateField } from "@/src/comps/InterestRateField/InterestRateField";
 import { LeverageField, useLeverageField } from "@/src/comps/LeverageField/LeverageField";
 import { RedemptionInfo } from "@/src/comps/RedemptionInfo/RedemptionInfo";
 import { Screen } from "@/src/comps/Screen/Screen";
-import {
-  DATA_REFRESH_INTERVAL,
-  ETH_MAX_RESERVE,
-  INTEREST_RATE_DEFAULT,
-  LEVERAGE_MAX_SLIPPAGE,
-  MAX_COLLATERAL_DEPOSITS,
-  MIN_DEBT,
-} from "@/src/constants";
+import { ETH_MAX_RESERVE, LEVERAGE_MAX_SLIPPAGE, MAX_COLLATERAL_DEPOSITS, MIN_DEBT } from "@/src/constants";
 import content from "@/src/content";
-import { getContracts, getProtocolContract } from "@/src/contracts";
 import { dnum18, dnumMax } from "@/src/dnum-utils";
 import { useInputFieldValue } from "@/src/form-utils";
 import { fmtnum } from "@/src/formatting";
-import { getOpenLeveragedTroveParams } from "@/src/liquity-leverage";
+import { useCheckLeverageSlippage } from "@/src/liquity-leverage";
 import { getRedemptionRisk } from "@/src/liquity-math";
-import { getCollIndexFromSymbol } from "@/src/liquity-utils";
-import { useDebouncedQueryKey } from "@/src/react-utils";
-import { useAccount, useBalance, useWagmiConfig } from "@/src/services/Ethereum";
+import { getBranch, getBranches, getCollToken } from "@/src/liquity-utils";
 import { usePrice } from "@/src/services/Prices";
 import { useTransactionFlow } from "@/src/services/TransactionFlow";
-import { useTrovesCount } from "@/src/subgraph-hooks";
+import { useNextOwnerIndex } from "@/src/subgraph-hooks";
 import { infoTooltipProps } from "@/src/uikit-utils";
+import { useAccount, useBalance } from "@/src/wagmi-utils";
 import { css } from "@/styled-system/css";
 import {
   ADDRESS_ZERO,
   Button,
-  COLLATERALS as COLL_TOKENS,
   Dropdown,
   HFlex,
   IconSuggestion,
@@ -48,46 +38,35 @@ import {
   TokenIcon,
   VFlex,
 } from "@liquity2/uikit";
-import { useQuery } from "@tanstack/react-query";
 import * as dn from "dnum";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useReadContract } from "wagmi";
 
 export function LeverageScreen() {
-  const router = useRouter();
-  const account = useAccount();
-  const txFlow = useTransactionFlow();
-  const contracts = getContracts();
+  const branches = getBranches();
 
   // useParams() can return an array but not with the current
   // routing setup, so we can safely cast it to a string
-  const collSymbol = String(useParams().collateral ?? contracts.collaterals[0].symbol).toUpperCase();
+  const collSymbol = `${useParams().collateral ?? branches[0]?.symbol}`.toUpperCase();
   if (!isCollateralSymbol(collSymbol)) {
     throw new Error(`Invalid collateral symbol: ${collSymbol}`);
   }
 
-  const collIndex = getCollIndexFromSymbol(collSymbol);
-  if (collIndex === null) {
-    throw new Error(`Unknown collateral symbol: ${collSymbol}`);
-  }
+  const router = useRouter();
+  const account = useAccount();
+  const txFlow = useTransactionFlow();
 
-  const collateralTokens = contracts.collaterals.map(({ symbol }) => {
-    const collateral = COLL_TOKENS.find((c) => c.symbol === symbol);
-    if (!collateral) {
-      throw new Error(`Unknown collateral symbol: ${symbol}`);
-    }
-    return collateral;
-  });
+  const branch = getBranch(collSymbol);
+  const collaterals = branches.map((b) => getCollToken(b.branchId));
+  const collateral = getCollToken(branch.id);
 
-  const collToken = collateralTokens[collIndex];
-
-  const balances = Object.fromEntries(collateralTokens.map(({ symbol }) => (
+  const balances = Object.fromEntries(collaterals.map(({ symbol }) => (
     [symbol, useBalance(account.address, symbol)] as const
   )));
 
-  const troveCount = useTrovesCount(account.address ?? null, collIndex);
-  const collPrice = usePrice(collToken.symbol);
+  const nextOwnerIndex = useNextOwnerIndex(account.address ?? null, branch.id);
+
+  const collPrice = usePrice(collateral.symbol);
 
   const maxCollDeposit = MAX_COLLATERAL_DEPOSITS[collSymbol] ?? null;
   const depositPreLeverage = useInputFieldValue(fmtnum, {
@@ -100,28 +79,28 @@ export function LeverageScreen() {
     },
   });
 
-  const [interestRate, setInterestRate] = useState(dn.div(dn.from(INTEREST_RATE_DEFAULT, 18), 100));
+  const [interestRate, setInterestRate] = useState<null | Dnum>(null);
   const [interestRateMode, setInterestRateMode] = useState<DelegateMode>("manual");
   const [interestRateDelegate, setInterestRateDelegate] = useState<Address | null>(null);
 
   const leverageField = useLeverageField({
     depositPreLeverage: depositPreLeverage.parsed,
-    collPrice: collPrice ?? dn.from(0, 18),
-    collToken,
+    collPrice: collPrice.data ?? dn.from(0, 18),
+    collToken: collateral,
   });
 
+  // reset leverage when collateral changes
   useEffect(() => {
-    // reset leverage when collateral changes
-    leverageField.updateLeverageFactor(leverageField.leverageFactorSuggestions[0]);
-  }, [collToken.symbol, leverageField.leverageFactorSuggestions]);
+    leverageField.updateLeverageFactor(leverageField.leverageFactorSuggestions[0] ?? 1.1);
+  }, [collateral.symbol, leverageField.leverageFactorSuggestions]);
 
   const redemptionRisk = getRedemptionRisk(interestRate);
-  const depositUsd = depositPreLeverage.parsed && collPrice && dn.mul(
+  const depositUsd = depositPreLeverage.parsed && collPrice.data && dn.mul(
     depositPreLeverage.parsed,
-    collPrice,
+    collPrice.data,
   );
 
-  const collBalance = balances[collToken.symbol].data;
+  const collBalance = balances[collateral.symbol]?.data;
 
   const maxAmount = collBalance && dnumMax(
     dn.sub(collBalance, collSymbol === "ETH" ? ETH_MAX_RESERVE : 0), // Only keep a reserve for ETH, not LSTs
@@ -129,29 +108,32 @@ export function LeverageScreen() {
   );
 
   const newLoan: PositionLoanUncommitted = {
-    type: "leverage",
+    type: "multiply",
     status: "active",
     batchManager: interestRateDelegate,
     borrowed: leverageField.debt ?? dn.from(0, 18),
     borrower: account.address ?? ADDRESS_ZERO,
-    collIndex,
+    branchId: branch.id,
     deposit: depositPreLeverage.parsed
       ? dn.mul(depositPreLeverage.parsed, leverageField.leverageFactor)
       : dn.from(0, 18),
-    interestRate,
+    interestRate: interestRate ?? dn.from(0, 18),
     troveId: null,
   };
 
   const hasDeposit = Boolean(depositPreLeverage.parsed && dn.gt(depositPreLeverage.parsed, 0));
 
   const leverageSlippage = useCheckLeverageSlippage({
+    branchId: branch.id,
     initialDeposit: depositPreLeverage.parsed,
     leverageFactor: leverageField.leverageFactor,
-    ownerIndex: troveCount.data ?? null,
-    loan: newLoan,
+    ownerIndex: nextOwnerIndex.data ?? null,
   });
 
-  const leverageSlippageElements = useSlippageElements(leverageSlippage, hasDeposit && account.isConnected);
+  const leverageSlippageElements = useSlippageElements(
+    leverageSlippage,
+    hasDeposit && account.isConnected,
+  );
 
   const hasAllowedSlippage = leverageSlippage.data
     && dn.lte(leverageSlippage.data, LEVERAGE_MAX_SLIPPAGE);
@@ -173,7 +155,7 @@ export function LeverageScreen() {
           <HFlex>
             {content.leverageScreen.headline(
               <TokenIcon.Group>
-                {contracts.collaterals.map(({ symbol }) => (
+                {collaterals.map(({ symbol }) => (
                   <TokenIcon
                     key={symbol}
                     symbol={symbol}
@@ -199,11 +181,11 @@ export function LeverageScreen() {
               id="input-deposit"
               contextual={
                 <Dropdown
-                  items={collateralTokens.map(({ symbol, name }) => ({
+                  items={collaterals.map(({ symbol, name }) => ({
                     icon: <TokenIcon symbol={symbol} />,
                     label: name,
                     value: account.isConnected
-                      ? fmtnum(balances[symbol].data ?? 0)
+                      ? fmtnum(balances[symbol]?.data ?? 0)
                       : "−",
                   }))}
                   menuPlacement="end"
@@ -213,23 +195,27 @@ export function LeverageScreen() {
                       depositPreLeverage.setValue("");
                       depositPreLeverage.focus();
                     }, 0);
-                    const { symbol } = collateralTokens[index];
+                    const collToken = collaterals[index];
+                    if (!collToken) {
+                      throw new Error(`Unknown branch: ${index}`);
+                    }
+                    const { symbol } = collToken;
                     router.push(
-                      `/leverage/${symbol.toLowerCase()}`,
+                      `/multiply/${symbol.toLowerCase()}`,
                       { scroll: false },
                     );
                   }}
-                  selected={collIndex}
+                  selected={branch.id}
                 />
               }
               label={content.leverageScreen.depositField.label}
               placeholder="0.00"
               secondary={{
-                start: depositUsd && `$${fmtnum(depositUsd, "2z")}`,
+                start: fmtnum(depositUsd, { prefix: "$", preset: "2z" }),
                 end: maxAmount
                   ? (
                     <TextButton
-                      label={`Max ${fmtnum(maxAmount)} ${collToken.name}`}
+                      label={`Max ${fmtnum(maxAmount)} ${collateral.name}`}
                       onClick={() => {
                         depositPreLeverage.setValue(dn.toString(maxAmount));
                       }}
@@ -241,15 +227,15 @@ export function LeverageScreen() {
             />
           }
           footer={{
-            start: collPrice && (
+            start: collPrice.data && (
               <Field.FooterInfoCollPrice
-                collName={collToken.name}
-                collPriceUsd={collPrice}
+                collName={collateral.name}
+                collPriceUsd={collPrice.data}
               />
             ),
             end: (
               <Field.FooterInfoMaxLtv
-                maxLtv={dn.div(dn.from(1, 18), collToken.collateralRatio)}
+                maxLtv={dn.div(dn.from(1, 18), collateral.collateralRatio)}
               />
             ),
           }}
@@ -292,7 +278,7 @@ export function LeverageScreen() {
                         value={leverageField.deposit && dn.gt(leverageField.deposit, 0) ? leverageField.deposit : null}
                         format="2z"
                         fallback="−"
-                        suffix={` ${collToken.name}`}
+                        suffix={` ${collateral.name}`}
                       />
                     </div>
                     <InfoTooltip {...infoTooltipProps(content.leverageScreen.infoTooltips.exposure)} />
@@ -306,7 +292,7 @@ export function LeverageScreen() {
         <Field
           field={
             <InterestRateField
-              collIndex={collIndex}
+              branchId={branch.id}
               debt={leverageField.debt}
               delegate={interestRateDelegate}
               inputId="input-interest-rate"
@@ -330,10 +316,12 @@ export function LeverageScreen() {
                   alignItems: "center",
                   gap: 4,
                   color: "contentAlt",
+                  fontSize: 14,
                 })}
               >
                 <IconSuggestion size={16} />
-                <span>You can adjust interest rate later</span>
+                <>You can adjust this rate at any time</>
+                <InfoTooltip {...infoTooltipProps(content.generalInfotooltips.interestRateAdjustment)} />
               </span>
             ),
           }}
@@ -350,7 +338,7 @@ export function LeverageScreen() {
             width: "100%",
           })}
         >
-          <ConnectWarningBox />
+          {/*<ConnectWarningBox />*/}
           <div
             className={css({
               display: "flex",
@@ -361,20 +349,25 @@ export function LeverageScreen() {
             })}
           >
             <Button
-              disabled={!allowSubmit}
-              label={content.leverageScreen.action}
+              disabled={true || !allowSubmit}
+              label="Coming Soon"
               mode="primary"
               size="large"
               wide
               onClick={() => {
-                if (depositPreLeverage.parsed && leverageField.debt && account.address) {
+                if (
+                  depositPreLeverage.parsed
+                  && leverageField.debt
+                  && account.address
+                  && typeof nextOwnerIndex.data === "number"
+                ) {
                   txFlow.start({
                     flowId: "openLeveragePosition",
-                    backLink: ["/leverage", "Back to editing"],
+                    backLink: ["/multiply", "Back to editing"],
                     successLink: ["/", "Go to the Dashboard"],
                     successMessage: "The leveraged position has been created successfully.",
 
-                    ownerIndex: troveCount.data ?? 0,
+                    ownerIndex: nextOwnerIndex.data,
                     leverageFactor: leverageField.leverageFactor,
                     loan: newLoan,
                   });
@@ -382,7 +375,8 @@ export function LeverageScreen() {
               }}
             />
 
-            {leverageSlippageElements.mode === "error"
+            {
+              /*leverageSlippageElements.mode === "error"
               ? (
                 <div
                   className={css({
@@ -396,69 +390,13 @@ export function LeverageScreen() {
                 <div>
                   {leverageSlippageElements.message}
                 </div>
-              )}
+              )*/
+            }
           </div>
         </div>
       </div>
     </Screen>
   );
-}
-
-export function useCheckLeverageSlippage({
-  initialDeposit,
-  leverageFactor,
-  loan,
-  ownerIndex,
-}: {
-  initialDeposit: Dnum | null;
-  leverageFactor: number;
-  loan: PositionLoanUncommitted;
-  ownerIndex: number | null;
-}) {
-  const { collIndex } = loan;
-  const wagmiConfig = useWagmiConfig();
-  const WethContract = getProtocolContract("WETH");
-  const ExchangeHelpersContract = getProtocolContract("ExchangeHelpers");
-
-  const debouncedQueryKey = useDebouncedQueryKey([
-    "openLeveragedTroveParams",
-    collIndex,
-    String(!initialDeposit || initialDeposit[0]),
-    leverageFactor,
-    ownerIndex,
-  ], 100);
-
-  const openLeveragedTroveParams = useQuery({
-    queryKey: debouncedQueryKey,
-    queryFn: () => (
-      initialDeposit && getOpenLeveragedTroveParams(
-        collIndex,
-        initialDeposit[0],
-        leverageFactor,
-        wagmiConfig,
-      )
-    ),
-    enabled: Boolean(
-      initialDeposit
-        && dn.gt(initialDeposit, 0)
-        && ownerIndex !== null,
-    ),
-    refetchInterval: DATA_REFRESH_INTERVAL,
-  });
-
-  const boldAmount = openLeveragedTroveParams.data?.expectedBoldAmount ?? 0n;
-  const flashLoanAmount = openLeveragedTroveParams.data?.flashLoanAmount ?? 0n;
-
-  return useReadContract({
-    abi: ExchangeHelpersContract.abi,
-    address: ExchangeHelpersContract.address,
-    functionName: "getCollFromBold",
-    args: [boldAmount, WethContract.address, flashLoanAmount],
-    query: {
-      enabled: Boolean(openLeveragedTroveParams.data),
-      select: (result) => dnum18(result[1]),
-    },
-  });
 }
 
 function useSlippageElements(
@@ -523,7 +461,6 @@ function useSlippageElements(
     const message = "Calculating slippage…";
     return {
       drawer: null,
-      // drawer: { mode: "loading", message },
       message,
       mode: "loading",
       onClose,
@@ -535,9 +472,8 @@ function useSlippageElements(
       <>
         Slippage too high: {fmtnum(
           leverageSlippage.data,
-          2,
-          100,
-        )}% (max {fmtnum(LEVERAGE_MAX_SLIPPAGE, 2, 100)}%)
+          "pct2",
+        )}% (max {fmtnum(LEVERAGE_MAX_SLIPPAGE, "pct2")}%)
       </>
     );
     return {
@@ -550,11 +486,6 @@ function useSlippageElements(
 
   return {
     drawer: null,
-    // drawer: {
-    //   mode: "success",
-    //   message: `Slippage below threshold (${fmtnum(LEVERAGE_MAX_SLIPPAGE, 2, 100)}%)`,
-    //   autoClose: 700,
-    // },
     onClose,
     mode: "success",
   };

@@ -1,62 +1,34 @@
 import type { FlowDeclaration } from "@/src/services/TransactionFlow";
 import type { ReactNode } from "react";
 
-import { getCollateralContract } from "@/src/contracts";
 import { fmtnum } from "@/src/formatting";
-import { getCollToken } from "@/src/liquity-utils";
-import { vAddress, vCollIndex, vDnum } from "@/src/valibot-utils";
+import { getBranch, getCollToken } from "@/src/liquity-utils";
+import { TransactionStatus } from "@/src/screens/TransactionsScreen/TransactionStatus";
+import { vAddress, vBranchId, vDnum } from "@/src/valibot-utils";
 import { css } from "@/styled-system/css";
 import { shortenAddress, TokenIcon } from "@liquity2/uikit";
 import { blo } from "blo";
 import Image from "next/image";
 import * as v from "valibot";
+import { createRequestSchema, verifyTransaction } from "./shared";
 
-const FlowIdSchema = v.literal("claimCollateralSurplus");
+const RequestSchema = createRequestSchema(
+  "claimCollateralSurplus",
+  {
+    borrower: vAddress(),
+    collSurplus: vDnum(),
+    branchId: vBranchId(),
+  },
+);
 
-const RequestSchema = v.object({
-  flowId: FlowIdSchema,
-  backLink: v.union([
-    v.null(),
-    v.tuple([
-      v.string(), // path
-      v.string(), // label
-    ]),
-  ]),
-  successLink: v.tuple([
-    v.string(), // path
-    v.string(), // label
-  ]),
-  successMessage: v.string(),
+export type ClaimCollateralSurplusRequest = v.InferOutput<typeof RequestSchema>;
 
-  borrower: vAddress(),
-  collSurplus: vDnum(),
-  collIndex: vCollIndex(),
-});
-
-export type Request = v.InferOutput<typeof RequestSchema>;
-
-type Step = "claimCollateral";
-
-const stepNames: Record<Step, string> = {
-  claimCollateral: "Claim remaining collateral",
-};
-
-export const claimCollateralSurplus: FlowDeclaration<Request, Step> = {
+export const claimCollateralSurplus: FlowDeclaration<ClaimCollateralSurplusRequest> = {
   title: "Review & Send Transaction",
 
-  Summary({ flow }) {
-    const { collIndex, collSurplus, borrower } = flow.request;
-
-    const collToken = getCollToken(collIndex);
-    if (!collToken) {
-      throw new Error("Invalid collateral index: " + collIndex);
-    }
-
-    const csp = getCollateralContract(collIndex, "CollSurplusPool");
-    if (!csp) {
-      throw new Error("Collateral surplus pool not found for collateral index: " + collIndex);
-    }
-
+  Summary({ request }) {
+    const { branchId, collSurplus, borrower } = request;
+    const collToken = getCollToken(branchId);
     return (
       <div
         className={css({
@@ -173,9 +145,9 @@ export const claimCollateralSurplus: FlowDeclaration<Request, Step> = {
     );
   },
 
-  Details({ flow }) {
-    const { collIndex } = flow.request;
-    const collateral = getCollToken(collIndex);
+  Details({ request }) {
+    const { branchId } = request;
+    const collateral = getCollToken(branchId);
 
     return (
       <div className="p-4">
@@ -187,8 +159,25 @@ export const claimCollateralSurplus: FlowDeclaration<Request, Step> = {
     );
   },
 
-  getStepName(stepId) {
-    return stepNames[stepId];
+  steps: {
+    claimCollateral: {
+      name: () => "Claim remaining collateral",
+      Status: TransactionStatus,
+
+      async commit(ctx) {
+        const { branchId } = ctx.request;
+        const branch = getBranch(branchId);
+        return ctx.writeContract({
+          ...branch.contracts.BorrowerOperations,
+          functionName: "claimCollateral",
+          args: [],
+        });
+      },
+
+      async verify(ctx, hash) {
+        await verifyTransaction(ctx.wagmiConfig, hash, ctx.isSafe);
+      },
+    },
   },
 
   async getSteps() {
@@ -197,20 +186,6 @@ export const claimCollateralSurplus: FlowDeclaration<Request, Step> = {
 
   parseRequest(request) {
     return v.parse(RequestSchema, request);
-  },
-
-  async writeContractParams(stepId, { contracts, request }) {
-    const { collIndex } = request;
-    const { contracts: collContracts } = contracts.collaterals[collIndex];
-    if (stepId === "claimCollateral") {
-      return {
-        ...collContracts.BorrowerOperations,
-        functionName: "claimCollateral",
-        args: [],
-      };
-    }
-
-    throw new Error("Invalid stepId: " + stepId);
   },
 };
 

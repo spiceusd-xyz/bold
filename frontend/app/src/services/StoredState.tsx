@@ -14,15 +14,21 @@ export const StoredStateSchema = v.object({
     vPrefixedTroveId(),
     v.union([
       v.literal("borrow"),
-      v.literal("leverage"),
+      v.literal("multiply"),
     ]),
   ),
+  preferredApproveMethod: v.union([
+    v.literal("permit"),
+    v.literal("approve-amount"),
+    v.literal("approve-infinite"),
+  ]),
 });
 
 type StoredStateType = v.InferOutput<typeof StoredStateSchema>;
 
 const defaultState: StoredStateType = {
   loanModes: {},
+  preferredApproveMethod: "permit",
 };
 
 type StoredStateContext = StoredStateType & {

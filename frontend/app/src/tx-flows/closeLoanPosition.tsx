@@ -4,86 +4,57 @@ import { Amount } from "@/src/comps/Amount/Amount";
 import { ETH_GAS_COMPENSATION } from "@/src/constants";
 import { fmtnum } from "@/src/formatting";
 import { getCloseFlashLoanAmount } from "@/src/liquity-leverage";
-import { getCollToken, getPrefixedTroveId } from "@/src/liquity-utils";
+import { getBranch, getCollToken, getPrefixedTroveId } from "@/src/liquity-utils";
 import { LoanCard } from "@/src/screens/TransactionsScreen/LoanCard";
 import { TransactionDetailsRow } from "@/src/screens/TransactionsScreen/TransactionsScreen";
+import { TransactionStatus } from "@/src/screens/TransactionsScreen/TransactionStatus";
 import { usePrice } from "@/src/services/Prices";
-import { graphQuery, TroveByIdQuery } from "@/src/subgraph-queries";
+import { graphQuery, TroveStatusByIdQuery } from "@/src/subgraph-queries";
+import { sleep } from "@/src/utils";
 import { vPositionLoanCommited } from "@/src/valibot-utils";
-import { ADDRESS_ZERO } from "@liquity2/uikit";
 import * as dn from "dnum";
 import * as v from "valibot";
-import { readContract } from "wagmi/actions";
+import { maxUint256 } from "viem";
+import { readContract, readContracts } from "wagmi/actions";
+import { createRequestSchema, verifyTransaction } from "./shared";
 
-const FlowIdSchema = v.literal("closeLoanPosition");
+const RequestSchema = createRequestSchema(
+  "closeLoanPosition",
+  {
+    loan: vPositionLoanCommited(),
+    repayWithCollateral: v.boolean(),
+  },
+);
 
-const RequestSchema = v.object({
-  flowId: FlowIdSchema,
+export type CloseLoanPositionRequest = v.InferOutput<typeof RequestSchema>;
 
-  backLink: v.union([
-    v.null(),
-    v.tuple([
-      v.string(), // path
-      v.string(), // label
-    ]),
-  ]),
-  successLink: v.tuple([
-    v.string(), // path
-    v.string(), // label
-  ]),
-  successMessage: v.string(),
-
-  loan: vPositionLoanCommited(),
-  repayWithCollateral: v.boolean(),
-});
-
-export type Request = v.InferOutput<typeof RequestSchema>;
-
-type Step =
-  | "closeLoanPosition"
-  | "closeLoanPositionFromCollateral"
-  | "approveBold";
-
-const stepNames: Record<Step, string> = {
-  approveBold: "Approve BOLD",
-  closeLoanPosition: "Close loan",
-  closeLoanPositionFromCollateral: "Close loan",
-};
-
-export const closeLoanPosition: FlowDeclaration<Request, Step> = {
+export const closeLoanPosition: FlowDeclaration<CloseLoanPositionRequest> = {
   title: "Review & Send Transaction",
 
-  Summary({ flow }) {
-    const { loan } = flow.request;
-
+  Summary({ request }) {
     return (
       <LoanCard
         leverageMode={false}
         loadingState="success"
         loan={null}
-        prevLoan={loan}
+        prevLoan={request.loan}
         onRetry={() => {}}
         txPreviewMode
       />
     );
   },
 
-  Details({ flow }) {
-    const { loan, repayWithCollateral } = flow.request;
-    const collateral = getCollToken(loan.collIndex);
-
-    if (!collateral) {
-      throw new Error("Invalid collateral index: " + loan.collIndex);
-    }
-
+  Details({ request }) {
+    const { loan, repayWithCollateral } = request;
+    const collateral = getCollToken(loan.branchId);
     const collPrice = usePrice(collateral.symbol);
 
-    if (!collPrice) {
+    if (!collPrice.data) {
       return null;
     }
 
     const amountToRepay = repayWithCollateral
-      ? (dn.div(loan.borrowed ?? dn.from(0), collPrice))
+      ? (dn.div(loan.borrowed ?? dn.from(0), collPrice.data))
       : (loan.borrowed ?? dn.from(0));
 
     const collToReclaim = repayWithCollateral
@@ -92,16 +63,18 @@ export const closeLoanPosition: FlowDeclaration<Request, Step> = {
 
     return (
       <>
-        <TransactionDetailsRow
-          label={repayWithCollateral ? "You repay (from collateral)" : "You repay"}
-          value={[
-            <Amount
-              key="start"
-              value={amountToRepay}
-              suffix={` ${repayWithCollateral ? collateral.symbol : "BOLD"}`}
-            />,
-          ]}
-        />
+        {dn.gt(amountToRepay, 0) && (
+          <TransactionDetailsRow
+            label={repayWithCollateral ? "You repay (from collateral)" : "You repay"}
+            value={[
+              <Amount
+                key="start"
+                value={amountToRepay}
+                suffix={` ${repayWithCollateral ? collateral.symbol : "BOLD"}`}
+              />,
+            ]}
+          />
+        )}
         <TransactionDetailsRow
           label="You reclaim collateral"
           value={[
@@ -127,126 +100,159 @@ export const closeLoanPosition: FlowDeclaration<Request, Step> = {
     );
   },
 
-  getStepName(stepid) {
-    return stepNames[stepid];
+  steps: {
+    approveBold: {
+      name: () => "Approve BOLD",
+      Status: (props) => (
+        <TransactionStatus
+          {...props}
+          approval="approve-only"
+        />
+      ),
+      async commit(ctx) {
+        const { loan } = ctx.request;
+        const branch = getBranch(loan.branchId);
+        const { entireDebt } = await readContract(ctx.wagmiConfig, {
+          ...branch.contracts.TroveManager,
+          functionName: "getLatestTroveData",
+          args: [BigInt(loan.troveId)],
+        });
+
+        const Zapper = branch.symbol === "ETH"
+          ? branch.contracts.LeverageWETHZapper
+          : branch.contracts.LeverageLSTZapper;
+
+        return ctx.writeContract({
+          ...ctx.contracts.BoldToken,
+          functionName: "approve",
+          args: [
+            Zapper.address,
+            ctx.preferredApproveMethod === "approve-infinite"
+              ? maxUint256 // infinite approval
+              : dn.mul([entireDebt, 18], 1.1)[0], // exact amount (TODO: better estimate)
+          ],
+        });
+      },
+      async verify(ctx, hash) {
+        await verifyTransaction(ctx.wagmiConfig, hash, ctx.isSafe);
+      },
+    },
+
+    // Close a loan position, repaying with BOLD or with the collateral
+    closeLoanPosition: {
+      name: () => "Close loan",
+      Status: TransactionStatus,
+
+      async commit(ctx) {
+        const { loan } = ctx.request;
+        const branch = getBranch(loan.branchId);
+
+        // repay with BOLD => get ETH
+        if (!ctx.request.repayWithCollateral && branch.symbol === "ETH") {
+          return ctx.writeContract({
+            ...branch.contracts.LeverageWETHZapper,
+            functionName: "closeTroveToRawETH",
+            args: [BigInt(loan.troveId)],
+          });
+        }
+
+        // repay with BOLD => get LST
+        if (!ctx.request.repayWithCollateral) {
+          return ctx.writeContract({
+            ...branch.contracts.LeverageLSTZapper,
+            functionName: "closeTroveToRawETH",
+            args: [BigInt(loan.troveId)],
+          });
+        }
+
+        // from here, we are repaying with the collateral
+
+        const closeFlashLoanAmount = await getCloseFlashLoanAmount(
+          loan.branchId,
+          loan.troveId,
+          ctx.wagmiConfig,
+        );
+
+        if (closeFlashLoanAmount === null) {
+          throw new Error("The flash loan amount could not be calculated.");
+        }
+
+        // repay with collateral => get ETH
+        if (branch.symbol === "ETH") {
+          return ctx.writeContract({
+            ...branch.contracts.LeverageWETHZapper,
+            functionName: "closeTroveFromCollateral",
+            args: [BigInt(loan.troveId), closeFlashLoanAmount],
+          });
+        }
+
+        // repay with collateral => get LST
+        return ctx.writeContract({
+          ...branch.contracts.LeverageLSTZapper,
+          functionName: "closeTroveFromCollateral",
+          args: [BigInt(loan.troveId), closeFlashLoanAmount],
+        });
+      },
+
+      async verify(ctx, hash) {
+        await verifyTransaction(ctx.wagmiConfig, hash, ctx.isSafe);
+
+        const prefixedTroveId = getPrefixedTroveId(
+          ctx.request.loan.branchId,
+          ctx.request.loan.troveId,
+        );
+
+        // wait for the trove to be seen as closed in the subgraph
+        while (true) {
+          const { trove: troveStatus } = await graphQuery(TroveStatusByIdQuery, {
+            id: prefixedTroveId,
+          });
+          if (troveStatus?.closedAt !== undefined) {
+            break;
+          }
+          await sleep(1000);
+        }
+      },
+    },
   },
 
-  async getSteps({ account, contracts, request, wagmiConfig }) {
-    const { loan } = request;
+  async getSteps(ctx) {
+    const { loan } = ctx.request;
+    const branch = getBranch(loan.branchId);
 
-    const coll = contracts.collaterals[loan.collIndex];
+    const Zapper = branch.symbol === "ETH"
+      ? branch.contracts.LeverageWETHZapper
+      : branch.contracts.LeverageLSTZapper;
 
-    const Zapper = coll.symbol === "ETH"
-      ? coll.contracts.LeverageWETHZapper
-      : coll.contracts.LeverageLSTZapper;
-
-    if (!account.address) {
-      throw new Error("Account address is required");
-    }
-
-    const { entireDebt } = await readContract(wagmiConfig, {
-      ...coll.contracts.TroveManager,
-      functionName: "getLatestTroveData",
-      args: [BigInt(loan.troveId)],
+    const [{ entireDebt }, boldAllowance] = await readContracts(ctx.wagmiConfig, {
+      contracts: [{
+        ...branch.contracts.TroveManager,
+        functionName: "getLatestTroveData",
+        args: [BigInt(loan.troveId)],
+      }, {
+        ...ctx.contracts.BoldToken,
+        functionName: "allowance",
+        args: [ctx.account, Zapper.address],
+      }],
+      allowFailure: false,
     });
 
-    const isBoldApproved = request.repayWithCollateral || !dn.gt(entireDebt, [
-      await readContract(wagmiConfig, {
-        ...contracts.BoldToken,
-        functionName: "allowance",
-        args: [account.address, Zapper.address],
-      }) ?? 0n,
-      18,
-    ]);
+    const isBoldApproved = ctx.request.repayWithCollateral || (
+      entireDebt <= boldAllowance
+    );
 
-    const closeStep = request.repayWithCollateral
-      ? "closeLoanPositionFromCollateral" as const
-      : "closeLoanPosition" as const;
+    const steps: string[] = [];
 
-    return [
-      isBoldApproved ? null : "approveBold" as const,
-      closeStep,
-    ].filter((step) => step !== null);
+    if (!isBoldApproved) {
+      steps.push("approveBold");
+    }
+
+    steps.push("closeLoanPosition");
+
+    return steps;
   },
 
   parseRequest(request) {
     return v.parse(RequestSchema, request);
-  },
-
-  async writeContractParams(stepId, { contracts, request, wagmiConfig }) {
-    const { loan } = request;
-
-    const coll = contracts.collaterals[loan.collIndex];
-
-    if (stepId === "approveBold") {
-      const { entireDebt } = await readContract(wagmiConfig, {
-        ...coll.contracts.TroveManager,
-        functionName: "getLatestTroveData",
-        args: [BigInt(loan.troveId)],
-      });
-
-      const Zapper = coll.symbol === "ETH"
-        ? coll.contracts.LeverageWETHZapper
-        : coll.contracts.LeverageLSTZapper;
-
-      return {
-        ...contracts.BoldToken,
-        functionName: "approve",
-        args: [Zapper.address, dn.mul([entireDebt, 18], 1.1)[0]], // TODO: calculate the amount to approve in a more precise way
-      };
-    }
-
-    if (stepId === "closeLoanPosition") {
-      return coll.symbol === "ETH"
-        ? {
-          ...coll.contracts.LeverageWETHZapper,
-          functionName: "closeTroveToRawETH" as const,
-          args: [loan.troveId],
-        }
-        : {
-          ...coll.contracts.LeverageLSTZapper,
-          functionName: "closeTroveToRawETH" as const,
-          args: [loan.troveId],
-        };
-    }
-
-    if (stepId === "closeLoanPositionFromCollateral") {
-      const closeFlashLoanAmount = await getCloseFlashLoanAmount(loan.collIndex, loan.troveId, wagmiConfig);
-
-      if (!closeFlashLoanAmount) {
-        throw new Error("Could not calculate closeFlashLoanAmount");
-      }
-
-      const closeParams = {
-        troveId: BigInt(loan.troveId),
-        flashLoanAmount: closeFlashLoanAmount,
-        receiver: ADDRESS_ZERO,
-      };
-
-      return coll.symbol === "ETH"
-        ? {
-          ...coll.contracts.LeverageWETHZapper,
-          functionName: "closeTroveFromCollateral" as const,
-          args: [closeParams],
-        }
-        : {
-          ...coll.contracts.LeverageLSTZapper,
-          functionName: "closeTroveFromCollateral" as const,
-          args: [closeParams],
-        };
-    }
-
-    throw new Error("Invalid stepId: " + stepId);
-  },
-
-  async postFlowCheck({ request }) {
-    const prefixedTroveId = getPrefixedTroveId(
-      request.loan.collIndex,
-      request.loan.troveId,
-    );
-    while (true) {
-      const { trove } = await graphQuery(TroveByIdQuery, { id: prefixedTroveId });
-      if (trove?.closedAt !== undefined) return;
-    }
   },
 };

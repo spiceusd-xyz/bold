@@ -9,13 +9,13 @@ import { useDemoMode } from "@/src/demo-mode";
 import { ACCOUNT_STAKED_LQTY } from "@/src/demo-mode";
 import { dnum18 } from "@/src/dnum-utils";
 import { useStakePosition } from "@/src/liquity-utils";
-import { useAccount } from "@/src/services/Ethereum";
 import { usePrice } from "@/src/services/Prices";
 import { useTransactionFlow } from "@/src/services/TransactionFlow";
+import { useAccount } from "@/src/wagmi-utils";
 import { css } from "@/styled-system/css";
 import { Button, HFlex, TokenIcon, VFlex } from "@liquity2/uikit";
 import * as dn from "dnum";
-import { encodeFunctionData } from "viem";
+import { encodeFunctionData, zeroAddress } from "viem";
 import { useEstimateGas, useGasPrice } from "wagmi";
 
 export function PanelRewards() {
@@ -26,21 +26,21 @@ export function PanelRewards() {
   const ethPrice = usePrice("ETH");
 
   const stakePosition = useStakePosition(account.address ?? null);
-  const LqtyStaking = getProtocolContract("LqtyStaking");
+  const Governance = getProtocolContract("Governance");
 
   const gasEstimate = useEstimateGas({
     account: account.address,
     data: encodeFunctionData({
-      abi: LqtyStaking.abi,
-      functionName: "unstake",
-      args: [0n],
+      abi: Governance.abi,
+      functionName: "claimFromStakingV1",
+      args: [account.address ?? zeroAddress], // address to receive the payout
     }),
-    to: LqtyStaking.address,
+    to: Governance.address,
   });
 
   const gasPrice = useGasPrice();
 
-  if (!ethPrice) {
+  if (!ethPrice.data) {
     return null;
   }
 
@@ -48,7 +48,7 @@ export function PanelRewards() {
     ? dnum18(gasEstimate.data * gasPrice.data)
     : null;
 
-  const txGasPriceUsd = txGasPriceEth && dn.mul(txGasPriceEth, ethPrice);
+  const txGasPriceUsd = txGasPriceEth && dn.mul(txGasPriceEth, ethPrice.data);
 
   const rewardsLusd = (
     demoMode.enabled
@@ -64,7 +64,7 @@ export function PanelRewards() {
 
   const totalRewardsUsd = dn.add(
     rewardsLusd,
-    dn.mul(rewardsEth, ethPrice),
+    dn.mul(rewardsEth, ethPrice.data),
   );
 
   const allowSubmit = account.isConnected && dn.gt(totalRewardsUsd, 0);
@@ -130,13 +130,7 @@ export function PanelRewards() {
               successLink: ["/", "Go to the Dashboard"],
               successMessage: "The rewards have been claimed successfully.",
 
-              stakePosition: {
-                ...stakePosition.data,
-                rewards: {
-                  eth: dn.from(0, 18),
-                  lusd: dn.from(0, 18),
-                },
-              },
+              stakePosition: stakePosition.data,
               prevStakePosition: stakePosition.data,
             });
           }

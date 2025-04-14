@@ -20,7 +20,7 @@ contract TroveNFT is ERC721, ITroveNFT {
 
     constructor(IAddressesRegistry _addressesRegistry)
         ERC721(
-            string.concat("SpiceUSD Trove - ", _addressesRegistry.collToken().name()),
+            string.concat("SpiceUSD - ", _addressesRegistry.collToken().name()),
             string.concat("SUSD_", _addressesRegistry.collToken().symbol())
         )
     {

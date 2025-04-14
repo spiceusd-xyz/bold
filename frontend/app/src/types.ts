@@ -1,16 +1,28 @@
 import type { Address, CollateralSymbol, Token, TokenSymbol } from "@liquity2/uikit";
 import type { Dnum } from "dnum";
 import type { ReactNode } from "react";
+import type { BranchContracts } from "./contracts";
 
 export type { Address, CollateralSymbol, Dnum, Token, TokenSymbol };
 
 export type RiskLevel = "low" | "medium" | "high";
 
-export type CollIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
-export type TroveId = `0x${string}`;
-export type PrefixedTroveId = `${CollIndex}:${TroveId}`;
+export type BranchId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 
-export function isCollIndex(value: unknown): value is CollIndex {
+export type TroveId = `0x${string}`;
+export type PrefixedTroveId = `${BranchId}:${TroveId}`;
+
+export type Branch = {
+  id: BranchId;
+  contracts: BranchContracts;
+  branchId: BranchId; // to be removed, use `id` instead
+  symbol: CollateralSymbol;
+  strategies: Array<{ address: Address; name: string }>;
+};
+
+export type EnvBranch = Omit<Branch, "contracts">;
+
+export function isBranchId(value: unknown): value is BranchId {
   return typeof value === "number" && value >= 0 && value <= 9;
 }
 
@@ -40,14 +52,14 @@ export type MenuSection = {
 };
 
 export type PositionLoanBase = {
-  // TODO: rename the type to "loan" and move "borrow" | "leverage" to
+  // TODO: rename the type to "loan" and move "borrow" | "multiply" to
   // a "mode" field. The two separate types come from a previous design
   // where the two types of positions were having separate types.
-  type: "borrow" | "leverage";
+  type: "borrow" | "multiply";
   batchManager: null | Address;
   borrowed: Dnum;
   borrower: Address;
-  collIndex: CollIndex;
+  branchId: BranchId;
   deposit: Dnum;
   interestRate: Dnum;
   status:
@@ -59,7 +71,6 @@ export type PositionLoanBase = {
 
 export type PositionLoanCommitted = PositionLoanBase & {
   troveId: TroveId;
-  updatedAt: number;
   createdAt: number;
 };
 
@@ -70,7 +81,7 @@ export type PositionLoanUncommitted = PositionLoanBase & {
 export type PositionLoan = PositionLoanCommitted | PositionLoanUncommitted;
 
 export function isPositionLoan(position: Position): position is PositionLoan {
-  return position.type === "borrow" || position.type === "leverage";
+  return position.type === "borrow" || position.type === "multiply";
 }
 export function isPositionLoanCommitted(
   position: Position,
@@ -86,7 +97,7 @@ export function isPositionLoanUncommitted(
 export type PositionEarn = {
   type: "earn";
   owner: Address;
-  collIndex: CollIndex;
+  branchId: BranchId;
   deposit: Dnum;
   rewards: {
     bold: Dnum;
@@ -98,7 +109,6 @@ export type PositionStake = {
   type: "stake";
   owner: Address;
   deposit: Dnum;
-  share: Dnum;
   totalStaked: Dnum;
   rewards: {
     lusd: Dnum;
@@ -115,7 +125,11 @@ export type Delegate = {
   followers: number;
   id: string;
   interestRate: Dnum;
-  interestRateChange: [Dnum, Dnum];
+  interestRateChange: {
+    min: Dnum;
+    max: Dnum;
+    period: bigint;
+  };
   lastDays: number;
   name: string;
   redemptions: Dnum;
@@ -145,3 +159,19 @@ export type LoanDetails = {
     | "liquidatable" // above the max LTV before liquidation
     | "underwater"; // above 100% LTV
 };
+
+// governance
+export type Initiative =
+  & {
+    address: Address;
+    name: string | null;
+    protocol: string | null;
+  }
+  & (
+    | { tvl: Dnum; pairVolume: Dnum; votesDistribution: Dnum }
+    | { tvl: null; pairVolume: null; votesDistribution: null }
+  );
+
+export type Vote = "for" | "against";
+export type VoteAllocation = { vote: Vote | null; value: Dnum };
+export type VoteAllocations = Record<Address, VoteAllocation>;
