@@ -1,21 +1,23 @@
 import type { PositionLoanCommitted } from "@/src/types";
+import type { Dnum } from "dnum";
 import type { ReactNode } from "react";
 
-import { getContracts } from "@/src/contracts";
 import { formatRedemptionRisk } from "@/src/formatting";
+import { fmtnum } from "@/src/formatting";
 import { getLiquidationRisk, getLtv, getRedemptionRisk } from "@/src/liquity-math";
+import { getCollToken } from "@/src/liquity-utils";
 import { usePrice } from "@/src/services/Prices";
 import { riskLevelToStatusMode } from "@/src/uikit-utils";
 import { css } from "@/styled-system/css";
-import { HFlex, IconLeverage, StatusDot, TokenIcon, TOKENS_BY_SYMBOL } from "@liquity2/uikit";
+import { HFlex, IconLeverage, StatusDot, TokenIcon } from "@liquity2/uikit";
 import * as dn from "dnum";
 import Link from "next/link";
 import { PositionCard } from "./PositionCard";
 import { CardRow, CardRows } from "./shared";
 
 export function PositionCardLeverage({
-  borrowed,
-  collIndex,
+  debt,
+  branchId,
   deposit,
   interestRate,
   statusTag,
@@ -23,35 +25,32 @@ export function PositionCardLeverage({
 }:
   & Pick<
     PositionLoanCommitted,
-    | "borrowed"
-    | "collIndex"
+    | "branchId"
     | "deposit"
     | "interestRate"
     | "troveId"
   >
   & {
+    debt: null | Dnum;
     statusTag?: ReactNode;
   })
 {
-  const contracts = getContracts();
-  const { symbol } = contracts.collaterals[collIndex];
-  const token = TOKENS_BY_SYMBOL[symbol];
-
-  const collateralPriceUsd = usePrice(symbol);
-
-  if (!collateralPriceUsd) {
-    return null;
+  const token = getCollToken(branchId);
+  if (!token) {
+    throw new Error(`Collateral token not found for index ${branchId}`);
   }
 
-  const ltv = getLtv(deposit, borrowed, collateralPriceUsd);
-  const redemptionRisk = getRedemptionRisk(interestRate);
+  const collateralPriceUsd = usePrice(token.symbol);
 
   const maxLtv = dn.from(1 / token.collateralRatio, 18);
+  const ltv = debt && collateralPriceUsd.data
+    && getLtv(deposit, debt, collateralPriceUsd.data);
   const liquidationRisk = ltv && getLiquidationRisk(ltv, maxLtv);
+  const redemptionRisk = getRedemptionRisk(interestRate);
 
   return (
     <Link
-      href={`/loan?id=${collIndex}:${troveId}`}
+      href={`/loan?id=${branchId}:${troveId}`}
       legacyBehavior
       passHref
     >
@@ -66,7 +65,7 @@ export function PositionCardLeverage({
               color: "positionContent",
             })}
           >
-            <div>Leverage loan</div>
+            <div>Multiply position</div>
             {statusTag}
           </div>,
         ]}
@@ -82,8 +81,8 @@ export function PositionCardLeverage({
         main={{
           value: (
             <HFlex gap={8} alignItems="center" justifyContent="flex-start">
-              {deposit ? dn.format(deposit, 2) : "−"}
-              <TokenIcon size={24} symbol={symbol} />
+              {deposit ? fmtnum(deposit, 2) : "−"}
+              <TokenIcon size={24} symbol={token.symbol} />
             </HFlex>
           ),
           label: "Net value",
@@ -121,7 +120,7 @@ export function PositionCardLeverage({
                           : "var(--status-negative)",
                       }}
                     >
-                      {dn.format(dn.mul(ltv, 100), 2)}%
+                      {fmtnum(ltv, "pct2")}%
                     </div>
                   )}
                 </div>
@@ -135,14 +134,16 @@ export function PositionCardLeverage({
                     fontSize: 14,
                   })}
                 >
-                  <div
-                    className={css({
-                      color: "positionContent",
-                    })}
-                  >
-                    {liquidationRisk === "low" ? "Low" : liquidationRisk === "medium" ? "Medium" : "High"}{" "}
-                    liquidation risk
-                  </div>
+                  {liquidationRisk && (
+                    <div
+                      className={css({
+                        color: "positionContent",
+                      })}
+                    >
+                      {liquidationRisk === "low" ? "Low" : liquidationRisk === "medium" ? "Medium" : "High"}{" "}
+                      liquidation risk
+                    </div>
+                  )}
                   <StatusDot
                     mode={riskLevelToStatusMode(liquidationRisk)}
                     size={8}
@@ -171,7 +172,7 @@ export function PositionCardLeverage({
                       color: "positionContent",
                     })}
                   >
-                    {dn.format(dn.mul(interestRate, 100), 2)}%
+                    {fmtnum(interestRate, "pct2")}%
                   </div>
                 </div>
               }

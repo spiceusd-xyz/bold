@@ -5,8 +5,7 @@ import { ActionCard } from "@/src/comps/ActionCard/ActionCard";
 import content from "@/src/content";
 import { ACCOUNT_POSITIONS } from "@/src/demo-mode";
 import { DEMO_MODE } from "@/src/env";
-import { useStakePosition } from "@/src/liquity-utils";
-import { useEarnPositionsByAccount, useLoansByAccount } from "@/src/subgraph-hooks";
+import { useEarnPositionsByAccount, useLoansByAccount, useStakePosition } from "@/src/liquity-utils";
 import { css } from "@/styled-system/css";
 import { a, useSpring, useTransition } from "@react-spring/web";
 import * as dn from "dnum";
@@ -118,7 +117,7 @@ function PositionsGroup({
         positions.map((position, index) => (
           match(position)
             .returnType<[number, ReactNode]>()
-            .with({ type: P.union("borrow", "leverage") }, (p) => [
+            .with({ type: P.union("borrow", "multiply") }, (p) => [
               index,
               <PositionCardLoan key={index} {...p} />,
             ])
@@ -145,7 +144,7 @@ function PositionsGroup({
       showNewPositionCard
         ? [
           [0, <ActionCard key="0" type="borrow" />],
-          [1, <ActionCard key="1" type="leverage" />],
+          [1, <ActionCard key="1" type="multiply" />],
           [2, <ActionCard key="2" type="earn" />],
           [3, <ActionCard key="3" type="stake" />],
         ]

@@ -13,7 +13,10 @@ export async function graphQuery<TResult, TVariables>(
       "Content-Type": "application/json",
       Accept: "application/graphql-response+json",
     },
-    body: JSON.stringify({ query, variables }),
+    body: JSON.stringify(
+      { query, variables },
+      (_, value) => typeof value === "bigint" ? String(value) : value,
+    ),
   });
 
   if (!response.ok) {
@@ -29,58 +32,18 @@ export async function graphQuery<TResult, TVariables>(
   return result.data as TResult;
 }
 
-export const TotalDepositedQuery = graphql(`
-  query TotalDeposited {
-    collaterals {
-      collIndex
-      totalDeposited
-    }
-  }
-`);
-
-export const TrovesCountQuery = graphql(`
-  query TrovesCount($id: ID!) {
+export const BorrowerInfoQuery = graphql(`
+  query BorrowerInfo($id: ID!) {
     borrowerInfo(id: $id) {
+      nextOwnerIndexes
       troves
       trovesByCollateral
     }
   }
 `);
 
-export const FullTroveQueryFragment = graphql(`
-  fragment FullTroveFragment on Trove {
-    id
-    borrower
-    closedAt
-    createdAt
-    debt
-    deposit
-    interestRate
-    mightBeLeveraged
-    stake
-    status
-    troveId
-    updatedAt
-    collateral {
-      id
-      token {
-        symbol
-        name
-      }
-      minCollRatio
-      collIndex
-    }
-    interestBatch {
-      id
-      annualInterestRate
-      annualManagementFee
-      batchManager
-    }
-  }
-`);
-
-export const TrovesByAccountQuery = graphql(`
-  query TrovesByAccount($account: Bytes!) {
+export const TroveStatusesByAccountQuery = graphql(`
+  query TroveStatusesByAccount($account: Bytes!) {
     troves(
       where: {
         borrower: $account,
@@ -90,150 +53,29 @@ export const TrovesByAccountQuery = graphql(`
       orderDirection: desc
     ) {
       id
-      borrower
       closedAt
       createdAt
-      debt
-      deposit
-      interestRate
       mightBeLeveraged
-      stake
       status
-      troveId
-      updatedAt
-      collateral {
-        id
-        token {
-          symbol
-          name
-        }
-        minCollRatio
-        collIndex
-      }
-      interestBatch {
-        id
-        annualInterestRate
-        annualManagementFee
-        batchManager
-      }
     }
   }
 `);
 
-export const TroveByIdQuery = graphql(`
-  query TroveById($id: ID!) {
+export const TroveStatusByIdQuery = graphql(`
+  query TroveStatusById($id: ID!) {
     trove(id: $id) {
       id
-      borrower
       closedAt
       createdAt
-      debt
-      deposit
-      interestRate
       mightBeLeveraged
-      stake
       status
-      troveId
-      updatedAt
-      collateral {
-        id
-        token {
-          symbol
-          name
-        }
-        minCollRatio
-        collIndex
-      }
-      interestBatch {
-        id
-        annualInterestRate
-        annualManagementFee
-        batchManager
-      }
     }
   }
 `);
 
-export const StabilityPoolQuery = graphql(`
-  query StabilityPool($id: ID!) {
-    stabilityPool(id: $id) {
-      id
-      totalDeposited
-    }
-  }
-`);
-
-export const StabilityPoolDepositQueryFragment = graphql(`
-  fragment StabilityPoolDepositFragment on StabilityPoolDeposit {
-    id
-    deposit
-    depositor
-    collateral {
-      collIndex
-    }
-    snapshot {
-      B
-      P
-      S
-      epoch
-      scale
-    }
-  }
-`);
-
-export const StabilityPoolDepositsByAccountQuery = graphql(`
-  query StabilityPoolDepositsByAccount($account: Bytes!) {
-    stabilityPoolDeposits(where: { depositor: $account, deposit_gt: 0 }) {
-      id
-      deposit
-      depositor
-      collateral {
-        collIndex
-      }
-      snapshot {
-        B
-        P
-        S
-        epoch
-        scale
-      }
-    }
-  }
-`);
-
-export const StabilityPoolDepositQuery = graphql(`
-  query StabilityPoolDeposit($id: ID!) {
-    stabilityPoolDeposit(id: $id) {
-      id
-      deposit
-      depositor
-      collateral {
-        collIndex
-      }
-      snapshot {
-        B
-        P
-        S
-        epoch
-        scale
-      }
-    }
-  }
-`);
-
-export const StabilityPoolEpochScaleQuery = graphql(`
-  query StabilityPoolEpochScale($id: ID!) {
-    stabilityPoolEpochScale(id: $id) {
-      id
-      B
-      S
-    }
-  }
-`);
-
-export const InterestBatchQuery = graphql(`
-  query InterestBatch($id: ID!) {
-    interestBatch(id: $id) {
+export const InterestBatchesQuery = graphql(`
+  query InterestBatches($ids: [ID!]!) {
+    interestBatches(where: { id_in: $ids }) {
       collateral {
         collIndex
       }
@@ -246,11 +88,71 @@ export const InterestBatchQuery = graphql(`
   }
 `);
 
-export const InterestRateBracketsQuery = graphql(`
-  query InterestRateBrackets($collId: String!) {
-    interestRateBrackets(where: { collateral: $collId }, orderBy: rate) {
+export const AllInterestRateBracketsQuery = graphql(`
+  query AllInterestRateBrackets {
+    interestRateBrackets(orderBy: rate) {
+      collateral {
+        collIndex
+      }
       rate
       totalDebt
+    }
+  }
+`);
+
+export const GovernanceInitiatives = graphql(`
+  query GovernanceInitiatives {
+    governanceInitiatives {
+      id
+    }
+  }
+`);
+
+export const GovernanceUser = graphql(`
+  query GovernanceUser($id: ID!) {
+    governanceUser(id: $id) {
+      id
+      allocatedLQTY
+      stakedLQTY
+      stakedOffset
+      allocations {
+        id
+        atEpoch
+        vetoLQTY
+        voteLQTY
+        initiative {
+          id
+        }
+      }
+    }
+  }
+`);
+
+export const GovernanceStats = graphql(`
+  query GovernanceStats {
+    governanceStats(id: "stats") {
+      id
+      totalLQTYStaked
+      totalOffset
+      totalInitiatives
+    }
+  }
+`);
+
+export const GovernanceUserAllocated = graphql(`
+  query GovernanceUserAllocations($id: ID!) {
+    governanceUser(id: $id) {
+      allocated
+    }
+  }
+`);
+
+export const BlockNumberQuery = graphql(`
+  query BlockNumber {
+    _meta {
+      block {
+        number
+      }
     }
   }
 `);

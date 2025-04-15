@@ -2,19 +2,12 @@ import type { Delegate, Position, PositionLoanUncommitted } from "@/src/types";
 import type { CollateralToken } from "@liquity2/uikit";
 import type { Dnum } from "dnum";
 
-import { INTEREST_RATE_INCREMENT, INTEREST_RATE_MAX, INTEREST_RATE_MIN } from "@/src/constants";
+import { INTEREST_RATE_END, INTEREST_RATE_START } from "@/src/constants";
 import * as dn from "dnum";
 
-export const PRICE_UPDATE_INTERVAL = 15_000;
-export const PRICE_UPDATE_VARIATION = 0.003;
-export const PRICE_UPDATE_MANUAL = false;
-
-export const LQTY_PRICE = dn.from(0.64832, 18);
-export const ETH_PRICE = dn.from(2_580.293872, 18);
-export const RETH_PRICE = dn.from(2_884.72294, 18);
-export const WSTETH_PRICE = dn.from(2_579.931, 18);
-export const BOLD_PRICE = dn.from(1.0031, 18);
-export const LUSD_PRICE = dn.from(1.012, 18);
+const INTEREST_RATE_INCREMENT = 0.1;
+const INTEREST_RATE_MIN = INTEREST_RATE_START * 100;
+const INTEREST_RATE_MAX = INTEREST_RATE_END * 100;
 
 export const STAKED_LQTY_TOTAL = [43_920_716_739_092_664_364_409_174n, 18] as const;
 
@@ -49,28 +42,26 @@ export const ACCOUNT_POSITIONS: Exclude<Position, PositionLoanUncommitted>[] = [
     deposit: dn.from(5.5, 18),
     interestRate: dn.from(0.067, 18),
     troveId: "0x01",
-    collIndex: 1,
+    branchId: 1,
     batchManager: null,
     createdAt: getTime(),
-    updatedAt: getTime(),
   },
   {
-    type: "leverage",
+    type: "multiply",
     status: "active",
     borrowed: dn.from(28_934.23, 18),
     borrower: DEMO_ACCOUNT,
     deposit: dn.from(19.20, 18), // 8 ETH @ 2.4 leverage
     interestRate: dn.from(0.045, 18),
     troveId: "0x02",
-    collIndex: 0,
+    branchId: 0,
     batchManager: null,
     createdAt: getTime(),
-    updatedAt: getTime(),
   },
   {
     type: "earn",
     owner: DEMO_ACCOUNT,
-    collIndex: 0,
+    branchId: 0,
     deposit: dn.from(5_000, 18),
     rewards: {
       bold: dn.from(789.438, 18),
@@ -81,7 +72,6 @@ export const ACCOUNT_POSITIONS: Exclude<Position, PositionLoanUncommitted>[] = [
     type: "stake",
     owner: DEMO_ACCOUNT,
     deposit: dn.from(3414, 18),
-    share: dn.div(dn.from(3414, 18), STAKED_LQTY_TOTAL),
     totalStaked: STAKED_LQTY_TOTAL,
     rewards: {
       lusd: dn.from(789.438, 18),
@@ -92,15 +82,15 @@ export const ACCOUNT_POSITIONS: Exclude<Position, PositionLoanUncommitted>[] = [
 
 export const BORROW_STATS = {
   ETH: {
-    collIndex: 0,
+    branchId: 0,
     totalDeposited: dn.from(30_330.9548, 18),
   },
   RETH: {
-    collIndex: 1,
+    branchId: 1,
     totalDeposited: dn.from(22_330.9548, 18),
   },
   WSTETH: {
-    collIndex: 2,
+    branchId: 2,
     totalDeposited: dn.from(18_030.9548, 18),
   },
 } as const;
@@ -149,10 +139,11 @@ export const INTEREST_CHART = INTEREST_RATE_BUCKETS.map(([_, size]) => (
 export function getDebtBeforeRateBucketIndex(index: number) {
   let debt = dn.from(0, 18);
   for (let i = 0; i < index; i++) {
-    if (!INTEREST_RATE_BUCKETS[i]) {
+    const bucket = INTEREST_RATE_BUCKETS[i];
+    if (!bucket) {
       break;
     }
-    debt = dn.add(debt, INTEREST_RATE_BUCKETS[i][1]);
+    debt = dn.add(debt, bucket[1]);
     if (i === index - 1) {
       break;
     }
@@ -170,10 +161,11 @@ export const DELEGATES: Delegate[] = [
     boldAmount: dn.from(25_130_000, 18),
     lastDays: 180,
     redemptions: dn.from(900_000, 18),
-    interestRateChange: [
-      dn.from(0.028, 18),
-      dn.from(0.0812, 18),
-    ],
+    interestRateChange: {
+      min: dn.from(0.028, 18),
+      max: dn.from(0.0812, 18),
+      period: 7n * 24n * 60n * 60n,
+    },
   },
   {
     id: "0x02",
@@ -184,10 +176,11 @@ export const DELEGATES: Delegate[] = [
     boldAmount: dn.from(15_730_000, 18),
     lastDays: 180,
     redemptions: dn.from(2_600_000, 18),
-    interestRateChange: [
-      dn.from(0.032, 18),
-      dn.from(0.069, 18),
-    ],
+    interestRateChange: {
+      min: dn.from(0.032, 18),
+      max: dn.from(0.069, 18),
+      period: 7n * 24n * 60n * 60n,
+    },
   },
   {
     id: "0x03",
@@ -198,10 +191,11 @@ export const DELEGATES: Delegate[] = [
     boldAmount: dn.from(12_000_000, 18),
     lastDays: 180,
     redemptions: dn.from(1_200_000, 18),
-    interestRateChange: [
-      dn.from(0.025, 18),
-      dn.from(0.078, 18),
-    ],
+    interestRateChange: {
+      min: dn.from(0.025, 18),
+      max: dn.from(0.078, 18),
+      period: 7n * 24n * 60n * 60n,
+    },
   },
   {
     id: "0x04",
@@ -212,10 +206,11 @@ export const DELEGATES: Delegate[] = [
     boldAmount: dn.from(7_000_000, 18),
     lastDays: 180,
     redemptions: dn.from(1_280_000, 18),
-    interestRateChange: [
-      dn.from(0.018, 18),
-      dn.from(0.065, 18),
-    ],
+    interestRateChange: {
+      min: dn.from(0.018, 18),
+      max: dn.from(0.065, 18),
+      period: 7n * 24n * 60n * 60n,
+    },
   },
   {
     id: "0x05",
@@ -226,10 +221,11 @@ export const DELEGATES: Delegate[] = [
     boldAmount: dn.from(3_000_000, 18),
     lastDays: 47,
     redemptions: dn.from(1_100_000, 18),
-    interestRateChange: [
-      dn.from(0.009, 18),
-      dn.from(0.058, 18),
-    ],
+    interestRateChange: {
+      min: dn.from(0.009, 18),
+      max: dn.from(0.058, 18),
+      period: 7n * 24n * 60n * 60n,
+    },
   },
   {
     id: "0x06",
@@ -240,10 +236,11 @@ export const DELEGATES: Delegate[] = [
     boldAmount: dn.from(1_000_000, 18),
     lastDays: 180,
     redemptions: dn.from(334_000, 18),
-    interestRateChange: [
-      dn.from(0.001, 18),
-      dn.from(0.043, 18),
-    ],
+    interestRateChange: {
+      min: dn.from(0.001, 18),
+      max: dn.from(0.043, 18),
+      period: 7n * 24n * 60n * 60n,
+    },
   },
   {
     id: "0x07",
@@ -254,10 +251,11 @@ export const DELEGATES: Delegate[] = [
     boldAmount: dn.from(30_000_000, 18),
     lastDays: 180,
     redemptions: dn.from(750_000, 18),
-    interestRateChange: [
-      dn.from(0.035, 18),
-      dn.from(0.089, 18),
-    ],
+    interestRateChange: {
+      min: dn.from(0.035, 18),
+      max: dn.from(0.089, 18),
+      period: 7n * 24n * 60n * 60n,
+    },
   },
   {
     id: "0x08",
@@ -268,10 +266,11 @@ export const DELEGATES: Delegate[] = [
     boldAmount: dn.from(22_500_000, 18),
     lastDays: 180,
     redemptions: dn.from(1_100_000, 18),
-    interestRateChange: [
-      dn.from(0.041, 18),
-      dn.from(0.072, 18),
-    ],
+    interestRateChange: {
+      min: dn.from(0.041, 18),
+      max: dn.from(0.072, 18),
+      period: 7n * 24n * 60n * 60n,
+    },
   },
   {
     id: "0x09",
@@ -282,10 +281,11 @@ export const DELEGATES: Delegate[] = [
     boldAmount: dn.from(18_000_000, 18),
     lastDays: 180,
     redemptions: dn.from(2_200_000, 18),
-    interestRateChange: [
-      dn.from(0.038, 18),
-      dn.from(0.102, 18),
-    ],
+    interestRateChange: {
+      min: dn.from(0.038, 18),
+      max: dn.from(0.102, 18),
+      period: 7n * 24n * 60n * 60n,
+    },
   },
   {
     id: "0x0a",
@@ -296,10 +296,11 @@ export const DELEGATES: Delegate[] = [
     boldAmount: dn.from(14_800_000, 18),
     lastDays: 180,
     redemptions: dn.from(500_000, 18),
-    interestRateChange: [
-      dn.from(0.029, 18),
-      dn.from(0.061, 18),
-    ],
+    interestRateChange: {
+      min: dn.from(0.029, 18),
+      max: dn.from(0.061, 18),
+      period: 7n * 24n * 60n * 60n,
+    },
   },
   {
     id: "0x0b",
@@ -310,10 +311,11 @@ export const DELEGATES: Delegate[] = [
     boldAmount: dn.from(20_500_000, 18),
     lastDays: 180,
     redemptions: dn.from(1_500_000, 18),
-    interestRateChange: [
-      dn.from(0.033, 18),
-      dn.from(0.085, 18),
-    ],
+    interestRateChange: {
+      min: dn.from(0.033, 18),
+      max: dn.from(0.085, 18),
+      period: 7n * 24n * 60n * 60n,
+    },
   },
   {
     id: "0x0c",
@@ -324,10 +326,11 @@ export const DELEGATES: Delegate[] = [
     boldAmount: dn.from(26_000_000, 18),
     lastDays: 180,
     redemptions: dn.from(1_800_000, 18),
-    interestRateChange: [
-      dn.from(0.037, 18),
-      dn.from(0.091, 18),
-    ],
+    interestRateChange: {
+      min: dn.from(0.037, 18),
+      max: dn.from(0.091, 18),
+      period: 7n * 24n * 60n * 60n,
+    },
   },
   {
     id: "0x0d",
@@ -338,10 +341,11 @@ export const DELEGATES: Delegate[] = [
     boldAmount: dn.from(17_500_000, 18),
     lastDays: 180,
     redemptions: dn.from(600_000, 18),
-    interestRateChange: [
-      dn.from(0.036, 18),
-      dn.from(0.067, 18),
-    ],
+    interestRateChange: {
+      min: dn.from(0.036, 18),
+      max: dn.from(0.067, 18),
+      period: 7n * 24n * 60n * 60n,
+    },
   },
   {
     id: "0x0e",
@@ -352,10 +356,11 @@ export const DELEGATES: Delegate[] = [
     boldAmount: dn.from(19_800_000, 18),
     lastDays: 180,
     redemptions: dn.from(1_300_000, 18),
-    interestRateChange: [
-      dn.from(0.031, 18),
-      dn.from(0.076, 18),
-    ],
+    interestRateChange: {
+      min: dn.from(0.031, 18),
+      max: dn.from(0.076, 18),
+      period: 7n * 24n * 60n * 60n,
+    },
   },
   {
     id: "0x0f",
@@ -366,10 +371,11 @@ export const DELEGATES: Delegate[] = [
     boldAmount: dn.from(28_500_000, 18),
     lastDays: 180,
     redemptions: dn.from(950_000, 18),
-    interestRateChange: [
-      dn.from(0.034, 18),
-      dn.from(0.088, 18),
-    ],
+    interestRateChange: {
+      min: dn.from(0.034, 18),
+      max: dn.from(0.088, 18),
+      period: 7n * 24n * 60n * 60n,
+    },
   },
   {
     id: "0x10",
@@ -380,10 +386,11 @@ export const DELEGATES: Delegate[] = [
     boldAmount: dn.from(23_000_000, 18),
     lastDays: 180,
     redemptions: dn.from(2_500_000, 18),
-    interestRateChange: [
-      dn.from(0.039, 18),
-      dn.from(0.098, 18),
-    ],
+    interestRateChange: {
+      min: dn.from(0.039, 18),
+      max: dn.from(0.098, 18),
+      period: 7n * 24n * 60n * 60n,
+    },
   },
 ];
 
@@ -397,13 +404,11 @@ export const IC_STRATEGIES: Delegate[] = [
     boldAmount: dn.from(25_130_000, 18),
     lastDays: 180,
     redemptions: dn.from(900_000, 18),
-    interestRateChange: [
-      dn.from(0.028, 18),
-      dn.from(0.0812, 18),
-    ],
+    interestRateChange: {
+      min: dn.from(0.028, 18),
+      max: dn.from(0.0812, 18),
+      period: 7n * 24n * 60n * 60n,
+    },
     fee: dn.from(0.00003, 18),
   },
 ];
-
-// Delegates + IC strategies
-export const DELEGATES_FULL = DELEGATES.concat(IC_STRATEGIES);

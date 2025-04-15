@@ -1,4 +1,5 @@
-import { $, echo, fs, minimist } from "zx";
+import { privateKeyToAccount } from "viem/accounts";
+import { $, chalk, echo, fs, minimist, question } from "zx";
 
 const HELP = `
 deploy - deploy the Liquity contracts.
@@ -24,15 +25,27 @@ Options:
                                            when DEPLOYER is an address).
   --dry-run                                Don't broadcast transaction, only
                                            simulate execution.
+  --epoch-start <EPOCH_START>              Unix timestamp for the start of the first
+                                           Governance epoch.
   --etherscan-api-key <ETHERSCAN_API_KEY>  Etherscan API key to verify the contracts
                                            (required when verifying with Etherscan).
   --gas-price <GAS_PRICE>                  Max fee per gas to use in transactions.
   --help, -h                               Show this help message.
+  --mode <DEPLOYMENT_MODE>                 Deploy in one of the following modes:
+                                           - complete (default),
+                                           - bold-only,
+                                           - use-existing-bold.
   --open-demo-troves                       Open demo troves after deployment (local
                                            only).
   --rpc-url <RPC_URL>                      RPC URL to use.
+  --salt <SALT>                            Use keccak256(bytes(SALT)) as CREATE2
+                                           salt instead of block timestamp.
+  --skip-confirmation                      Run non-interactively (skip confirmation).
   --slow                                   Only send a transaction after the previous
                                            one has been confirmed.
+  --unlocked                               Used when the deployer account is unlocked
+                                           in the client (i.e. no private key or
+                                           Ledger device needed).
   --use-testnet-pricefeeds                 Use testnet PriceFeeds instead of real
                                            oracles when deploying to mainnet.
   --verify                                 Verify contracts after deployment.
@@ -51,20 +64,25 @@ const argv = minimist(process.argv.slice(2), {
   alias: {
     h: "help",
   },
-  boolean: [
+  // We don't explicitly declare any options as boolean, so that we may tell the difference between an option missing
+  // or it being explicitly set to false
+  string: [
     "debug",
     "help",
     "open-demo-troves",
     "verify",
     "dry-run",
     "slow",
+    "unlocked",
     "use-testnet-pricefeeds",
-  ],
-  string: [
     "chain-id",
     "deployer",
+    "epoch-start",
     "etherscan-api-key",
     "ledger-path",
+    "mode",
+    "salt",
+    "skip-confirmation",
     "rpc-url",
     "verifier",
     "verifier-url",
@@ -100,6 +118,7 @@ export async function main() {
     options.chainId ??= 1;
   }
 
+  options.mode ??= "complete";
   options.verifier ??= "etherscan";
 
   // handle missing options
@@ -140,15 +159,15 @@ export async function main() {
     forgeArgs.push(options.gasPrice);
   }
 
+  // Etherscan API key
+  if (options.etherscanApiKey) {
+    forgeArgs.push("--etherscan-api-key");
+    forgeArgs.push(options.etherscanApiKey);
+  }
+
   // verify
   if (options.verify) {
     forgeArgs.push("--verify");
-
-    // Etherscan API key
-    if (options.etherscanApiKey) {
-      forgeArgs.push("--etherscan-api-key");
-      forgeArgs.push(options.etherscanApiKey);
-    }
 
     // verifier
     if (options.verifier) {
@@ -163,22 +182,37 @@ export async function main() {
     }
   }
 
-  // Ledger signing
+  let deployerAddress: string;
+
   if (options.deployer.startsWith("0x") && options.deployer.length === 42) {
-    forgeArgs.push("--ledger");
-    if (options.ledgerPath) {
-      forgeArgs.push("--hd-paths");
-      forgeArgs.push(options.ledgerPath);
+    // DEPLOYER is an address
+    deployerAddress = options.deployer;
+
+    if (options.unlocked) {
+      forgeArgs.push("--unlocked");
+    } else {
+      // Ledger signing
+      forgeArgs.push("--ledger");
+      if (options.ledgerPath) {
+        forgeArgs.push("--hd-paths");
+        forgeArgs.push(options.ledgerPath);
+      }
     }
+  } else {
+    // DEPLOYER is a private key, get its address
+    deployerAddress = privateKeyToAccount(options.deployer).address;
   }
 
   echo`
 Deploying Liquity contracts with the following settings:
 
   CHAIN_ID:               ${options.chainId}
-  DEPLOYER:               ${options.deployer}
-  LEDGER_PATH:            ${options.ledgerPath}
+  DEPLOYMENT_MODE:        ${options.mode}
+  DEPLOYER (address):     ${deployerAddress}
+  SALT:                   ${options.salt ? options.salt : chalk.yellow("block.timestamp will be used !!")}
+  EPOCH_START:            ${options.epochStart ? options.epochStart : chalk.yellow("auto based on block.timestamp will be used !!")}
   ETHERSCAN_API_KEY:      ${options.etherscanApiKey && "(secret)"}
+  LEDGER_PATH:            ${options.ledgerPath}
   OPEN_DEMO_TROVES:       ${options.openDemoTroves ? "yes" : "no"}
   RPC_URL:                ${options.rpcUrl}
   USE_TESTNET_PRICEFEEDS: ${options.useTestnetPricefeeds ? "yes" : "no"}
@@ -187,7 +221,27 @@ Deploying Liquity contracts with the following settings:
   VERIFIER_URL:           ${options.verifierUrl}
 `;
 
+  // User confirmation
+  if (!options.skipConfirmation) {
+    for (;;) {
+      const answer = (await question("Does that look good? (y/N) ")).toLowerCase();
+
+      if (answer === "y") {
+        echo("");
+        break;
+      }
+
+      if (answer === "" || answer === "n") {
+        echo("Deployment aborted.");
+        process.exit(1);
+      }
+    }
+  }
+
   process.env.DEPLOYER = options.deployer;
+  process.env.DEPLOYMENT_MODE = options.mode;
+  process.env.SALT = options.salt;
+  process.env.EPOCH_START = String(options.epochStart);
 
   if (options.openDemoTroves) {
     process.env.OPEN_DEMO_TROVES = "true";
@@ -217,6 +271,11 @@ Deploying Liquity contracts with the following settings:
     hintHelpers: string;
     multiTroveGetter: string;
   };
+
+  if (options.mode === "bold-only") {
+    echo("BoldToken address:", deploymentManifest.boldToken);
+    return;
+  }
 
   const protocolContracts = {
     BoldToken: deploymentManifest.boldToken,
@@ -289,18 +348,48 @@ function safeParseInt(value: string) {
   return isNaN(parsed) ? undefined : parsed;
 }
 
+function parseBoolValue(value: string): boolean {
+  return value !== "false"
+    && value !== "no"
+    && value !== "0";
+}
+
+// Passing an empty string for a bool parameter through the environment should count as not passing the parameter at all
+function parseBoolEnv(value: string | undefined): boolean | undefined {
+  if (value === undefined || value === "") return undefined;
+  return parseBoolValue(value);
+}
+
+// Passing a bool option without an explicit value (e.g. `--debug`) should count as true
+// In this case, value will be an empty string
+function parseBoolOption(value: string | undefined): boolean | undefined {
+  if (value == undefined) return undefined;
+  return value === "" || parseBoolValue(value);
+}
+
+function parseBool(optionValue: string | undefined, envValue?: string | undefined): boolean {
+  return parseBoolOption(optionValue)
+    ?? parseBoolEnv(envValue)
+    ?? false;
+}
+
 async function parseArgs() {
   const options = {
     chainId: safeParseInt(argv["chain-id"]),
     debug: argv["debug"],
     deployer: argv["deployer"],
+    epochStart: safeParseInt(argv["epoch-start"]),
     etherscanApiKey: argv["etherscan-api-key"],
     help: argv["help"],
     ledgerPath: argv["ledger-path"],
+    mode: argv["mode"],
+    salt: argv["salt"],
     openDemoTroves: argv["open-demo-troves"],
     rpcUrl: argv["rpc-url"],
     dryRun: argv["dry-run"],
+    skipConfirmation: argv["skip-confirmation"],
     slow: argv["slow"],
+    unlocked: argv["unlocked"],
     verify: argv["verify"],
     verifier: argv["verifier"],
     verifierUrl: argv["verifier-url"],
@@ -311,22 +400,22 @@ async function parseArgs() {
   const [networkPreset] = argv._;
 
   options.chainId ??= safeParseInt(process.env.CHAIN_ID ?? "");
-  options.debug ??= Boolean(
-    process.env.DEBUG && process.env.DEBUG !== "false",
-  );
+  options.debug = parseBool(options.debug, process.env.DEBUG);
   options.deployer ??= process.env.DEPLOYER;
+  options.dryRun = parseBool(options.dryRun, process.env.DRY_RUN);
+  options.epochStart ??= safeParseInt(process.env.EPOCH_START ?? "");
   options.etherscanApiKey ??= process.env.ETHERSCAN_API_KEY;
+  options.help = parseBool(options.help);
   options.ledgerPath ??= process.env.LEDGER_PATH;
-  options.openDemoTroves ??= Boolean(
-    process.env.OPEN_DEMO_TROVES && process.env.OPEN_DEMO_TROVES !== "false",
-  );
+  options.mode ??= process.env.DEPLOYMENT_MODE;
+  options.openDemoTroves = parseBool(options.openDemoTroves, process.env.OPEN_DEMO_TROVES);
   options.rpcUrl ??= process.env.RPC_URL;
-  options.useTestnetPricefeeds ??= Boolean(
-    process.env.USE_TESTNET_PRICEFEEDS && process.env.USE_TESTNET_PRICEFEEDS !== "false",
-  );
-  options.verify ??= Boolean(
-    process.env.VERIFY && process.env.VERIFY !== "false",
-  );
+  options.salt ??= process.env.SALT;
+  options.skipConfirmation = parseBool(options.skipConfirmation, process.env.SKIP_CONFIRMATION);
+  options.slow = parseBool(options.slow, process.env.SLOW);
+  options.unlocked = parseBool(options.unlocked, process.env.UNLOCKED);
+  options.useTestnetPricefeeds = parseBool(options.useTestnetPricefeeds, process.env.USE_TESTNET_PRICEFEEDS);
+  options.verify = parseBool(options.verify, process.env.VERIFY);
   options.verifier ??= process.env.VERIFIER;
   options.verifierUrl ??= process.env.VERIFIER_URL;
 

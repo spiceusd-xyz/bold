@@ -1,4 +1,4 @@
-import type { CollateralSymbol, CollIndex } from "@/src/types";
+import type { BranchId, CollateralSymbol } from "@/src/types";
 import type { Address } from "@liquity2/uikit";
 
 import { ActivePool } from "@/src/abi/ActivePool";
@@ -20,15 +20,17 @@ import { StabilityPool } from "@/src/abi/StabilityPool";
 import { TroveManager } from "@/src/abi/TroveManager";
 import { TroveNFT } from "@/src/abi/TroveNFT";
 import {
-  COLLATERAL_CONTRACTS,
   CONTRACT_BOLD_TOKEN,
   CONTRACT_COLLATERAL_REGISTRY,
   CONTRACT_EXCHANGE_HELPERS,
+  CONTRACT_GOVERNANCE,
   CONTRACT_HINT_HELPERS,
   CONTRACT_LQTY_STAKING,
   CONTRACT_LQTY_TOKEN,
+  CONTRACT_LUSD_TOKEN,
   CONTRACT_MULTI_TROVE_GETTER,
   CONTRACT_WETH,
+  ENV_BRANCHES,
 } from "@/src/env";
 import { erc20Abi, zeroAddress } from "viem";
 
@@ -40,11 +42,14 @@ const protocolAbis = {
   HintHelpers,
   LqtyStaking,
   LqtyToken,
+  LusdToken: erc20Abi,
   MultiTroveGetter,
   WETH: erc20Abi,
 } as const;
 
-const BorrowerOperationsErrorsAbi = BorrowerOperations.filter((f) => f.type === "error");
+const BorrowerOperationsErrorsAbi = BorrowerOperations.filter(
+  (f) => f.type === "error",
+);
 
 const collateralAbis = {
   ActivePool,
@@ -60,7 +65,12 @@ const collateralAbis = {
     ...LeverageWETHZapper,
     ...BorrowerOperationsErrorsAbi,
   ],
-  PriceFeed,
+  PriceFeed: PriceFeed.map((f) => (
+    f.name !== "fetchPrice" ? f : {
+      ...f,
+      stateMutability: "view",
+    } as const
+  )),
   SortedTroves,
   StabilityPool,
   TroveManager,
@@ -88,38 +98,53 @@ type Contract<T extends ContractName> = {
   address: Address;
 };
 
-type CollateralContracts = {
+export type BranchContracts = {
   [K in CollateralContractName]: Contract<K>;
 };
 
-type Collaterals = Array<{
-  collIndex: CollIndex;
-  contracts: CollateralContracts;
-  symbol: CollateralSymbol;
-}>;
-
 export type Contracts = ProtocolContractMap & {
-  collaterals: Collaterals;
+  branches: Array<{
+    id: BranchId;
+    branchId: BranchId;
+    contracts: BranchContracts;
+    symbol: CollateralSymbol;
+  }>;
 };
 
-const CONTRACTS: Contracts = {
+export const CONTRACTS: Contracts = {
   BoldToken: { abi: abis.BoldToken, address: CONTRACT_BOLD_TOKEN },
-  CollateralRegistry: { abi: abis.CollateralRegistry, address: CONTRACT_COLLATERAL_REGISTRY },
-  Governance: { abi: abis.Governance, address: zeroAddress },
-  ExchangeHelpers: { abi: abis.ExchangeHelpers, address: CONTRACT_EXCHANGE_HELPERS },
+  CollateralRegistry: {
+    abi: abis.CollateralRegistry,
+    address: CONTRACT_COLLATERAL_REGISTRY,
+  },
+  Governance: { abi: abis.Governance, address: CONTRACT_GOVERNANCE },
+  ExchangeHelpers: {
+    abi: abis.ExchangeHelpers,
+    address: CONTRACT_EXCHANGE_HELPERS,
+  },
   HintHelpers: { abi: abis.HintHelpers, address: CONTRACT_HINT_HELPERS },
   LqtyStaking: { abi: abis.LqtyStaking, address: CONTRACT_LQTY_STAKING },
   LqtyToken: { abi: abis.LqtyToken, address: CONTRACT_LQTY_TOKEN },
-  MultiTroveGetter: { abi: abis.MultiTroveGetter, address: CONTRACT_MULTI_TROVE_GETTER },
+  LusdToken: { abi: abis.LusdToken, address: CONTRACT_LUSD_TOKEN },
+  MultiTroveGetter: {
+    abi: abis.MultiTroveGetter,
+    address: CONTRACT_MULTI_TROVE_GETTER,
+  },
   WETH: { abi: abis.WETH, address: CONTRACT_WETH },
-
-  collaterals: COLLATERAL_CONTRACTS.map(({ collIndex, symbol, contracts }) => ({
-    collIndex,
+  branches: ENV_BRANCHES.map(({ branchId, symbol, contracts }) => ({
+    id: branchId,
+    branchId,
     symbol,
     contracts: {
       ActivePool: { address: contracts.ACTIVE_POOL, abi: abis.ActivePool },
-      BorrowerOperations: { address: contracts.BORROWER_OPERATIONS, abi: abis.BorrowerOperations },
-      CollSurplusPool: { address: contracts.COLL_SURPLUS_POOL, abi: abis.CollSurplusPool },
+      BorrowerOperations: {
+        address: contracts.BORROWER_OPERATIONS,
+        abi: abis.BorrowerOperations,
+      },
+      CollSurplusPool: {
+        address: contracts.COLL_SURPLUS_POOL,
+        abi: abis.CollSurplusPool,
+      },
       CollToken: { address: contracts.COLL_TOKEN, abi: abis.CollToken },
       DefaultPool: { address: contracts.DEFAULT_POOL, abi: abis.DefaultPool },
       LeverageLSTZapper: {
@@ -132,40 +157,54 @@ const CONTRACTS: Contracts = {
       },
       PriceFeed: { address: contracts.PRICE_FEED, abi: abis.PriceFeed },
       SortedTroves: { address: contracts.SORTED_TROVES, abi: abis.SortedTroves },
-      StabilityPool: { address: contracts.STABILITY_POOL, abi: abis.StabilityPool },
+      StabilityPool: {
+        address: contracts.STABILITY_POOL,
+        abi: abis.StabilityPool,
+      },
       TroveManager: { address: contracts.TROVE_MANAGER, abi: abis.TroveManager },
       TroveNFT: { address: contracts.TROVE_NFT, abi: abis.TroveNFT },
     },
   })),
 };
 
-export function getContracts(): Contracts {
-  return CONTRACTS;
-}
-
-export function getProtocolContract<CN extends ProtocolContractName>(
-  name: CN,
-): ProtocolContractMap[CN] {
+export function getProtocolContract<
+  CN extends ProtocolContractName,
+>(name: CN): ProtocolContractMap[CN] {
   return CONTRACTS[name];
 }
 
-export function getCollateralContracts(
-  collIndexOrSymbol: CollateralSymbol | CollIndex | null,
-): CollateralContracts | null {
-  if (collIndexOrSymbol === null) {
-    return null;
-  }
-  const { collaterals } = getContracts();
-  const collateral = typeof collIndexOrSymbol === "number"
-    ? collaterals[collIndexOrSymbol]
-    : collaterals.find((c) => c.symbol === collIndexOrSymbol);
-  return collateral?.contracts ?? null;
-}
-
-export function getCollateralContract<CN extends CollateralContractName>(
-  collIndexOrSymbol: CollateralSymbol | CollIndex | null,
+export function getBranchContract(
+  branchIdOrSymbol: null,
+  contractName: CollateralContractName,
+): null;
+export function getBranchContract<CN extends CollateralContractName>(
+  branchIdOrSymbol: CollateralSymbol | BranchId,
+  contractName: CN,
+): Contract<CN>;
+export function getBranchContract<CN extends CollateralContractName>(
+  branchIdOrSymbol: CollateralSymbol | BranchId | null,
+  contractName: CN,
+): Contract<CN> | null;
+export function getBranchContract<CN extends CollateralContractName>(
+  branchIdOrSymbol: CollateralSymbol | BranchId | null,
   contractName: CN,
 ): Contract<CN> | null {
-  const contracts = getCollateralContracts(collIndexOrSymbol);
-  return contracts?.[contractName] ?? null;
+  if (branchIdOrSymbol === null) {
+    return null;
+  }
+  const { branches } = CONTRACTS;
+
+  const branch = typeof branchIdOrSymbol === "number"
+    ? branches[branchIdOrSymbol]
+    : branches.find((c) => c.symbol === branchIdOrSymbol);
+  if (!branch) {
+    throw new Error(`No branch for index or symbol ${branchIdOrSymbol}`);
+  }
+
+  const contract = branch.contracts[contractName];
+  if (!contract) {
+    throw new Error(`No contract ${contractName} for branch ${branchIdOrSymbol}`);
+  }
+
+  return contract;
 }

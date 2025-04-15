@@ -1,34 +1,25 @@
 "use client";
 
 import type { DelegateMode } from "@/src/comps/InterestRateField/InterestRateField";
-import type { Address } from "@/src/types";
+import type { Address, Dnum } from "@/src/types";
 
 import { ConnectWarningBox } from "@/src/comps/ConnectWarningBox/ConnectWarningBox";
 import { Field } from "@/src/comps/Field/Field";
 import { InterestRateField } from "@/src/comps/InterestRateField/InterestRateField";
 import { RedemptionInfo } from "@/src/comps/RedemptionInfo/RedemptionInfo";
 import { Screen } from "@/src/comps/Screen/Screen";
-import {
-  DEBT_SUGGESTIONS,
-  ETH_MAX_RESERVE,
-  INTEREST_RATE_DEFAULT,
-  MAX_ANNUAL_INTEREST_RATE,
-  MAX_COLLATERAL_DEPOSITS,
-  MIN_ANNUAL_INTEREST_RATE,
-  MIN_DEBT,
-} from "@/src/constants";
+import { DEBT_SUGGESTIONS, ETH_MAX_RESERVE, MAX_COLLATERAL_DEPOSITS, MIN_DEBT } from "@/src/constants";
 import content from "@/src/content";
-import { getContracts } from "@/src/contracts";
-import { dnum18, dnumMax } from "@/src/dnum-utils";
+import { dnum18, dnumMax, dnumMin } from "@/src/dnum-utils";
 import { useInputFieldValue } from "@/src/form-utils";
 import { fmtnum } from "@/src/formatting";
 import { getLiquidationRisk, getLoanDetails, getLtv } from "@/src/liquity-math";
-import { useAccount, useBalance } from "@/src/services/Ethereum";
+import { getBranch, getBranches, getCollToken } from "@/src/liquity-utils";
 import { usePrice } from "@/src/services/Prices";
 import { useTransactionFlow } from "@/src/services/TransactionFlow";
-import { useTrovesCount } from "@/src/subgraph-hooks";
-import { isCollIndex } from "@/src/types";
+import { useNextOwnerIndex } from "@/src/subgraph-hooks";
 import { infoTooltipProps } from "@/src/uikit-utils";
+import { useAccount, useBalance } from "@/src/wagmi-utils";
 import { css } from "@/styled-system/css";
 import {
   Button,
@@ -51,39 +42,27 @@ import { maxUint256 } from "viem";
 const KNOWN_COLLATERAL_SYMBOLS = KNOWN_COLLATERALS.map(({ symbol }) => symbol);
 
 export function BorrowScreen() {
-  const router = useRouter();
-
-  const account = useAccount();
-  const txFlow = useTransactionFlow();
-  const contracts = getContracts();
-
+  const branches = getBranches();
   // useParams() can return an array but not with the current
   // routing setup, so we can safely cast it to a string
-  const collSymbol = String(useParams().collateral ?? contracts.collaterals[0].symbol).toUpperCase();
+  const collSymbol = `${useParams().collateral ?? branches[0]?.symbol}`.toUpperCase();
   if (!isCollateralSymbol(collSymbol)) {
     throw new Error(`Invalid collateral symbol: ${collSymbol}`);
   }
 
-  const collIndex = contracts.collaterals.findIndex(({ symbol }) => symbol === collSymbol);
-  if (!isCollIndex(collIndex)) {
-    throw new Error(`Unknown collateral symbol: ${collSymbol}`);
-  }
+  const router = useRouter();
+  const account = useAccount();
+  const txFlow = useTransactionFlow();
 
-  const collaterals = contracts.collaterals.map(({ symbol }) => {
-    const collateral = KNOWN_COLLATERALS.find((c) => c.symbol === symbol);
-    if (!collateral) {
-      throw new Error(`Unknown collateral symbol: ${symbol}`);
-    }
-    return collateral;
-  });
+  const branch = getBranch(collSymbol);
+  const collateral = getCollToken(branch.id);
+  const collaterals = branches.map((b) => getCollToken(b.branchId));
 
-  const collateral = collaterals[collIndex];
-
-  const maxCollDeposit = MAX_COLLATERAL_DEPOSITS[collSymbol] ?? null;
+  const maxCollDeposit = MAX_COLLATERAL_DEPOSITS[collSymbol];
 
   const deposit = useInputFieldValue(fmtnum, {
     validate: (parsed, value) => {
-      const isAboveMax = maxCollDeposit && parsed && dn.gt(parsed, maxCollDeposit);
+      const isAboveMax = parsed && dn.gt(parsed, maxCollDeposit);
       return {
         parsed: isAboveMax ? maxCollDeposit : parsed,
         value: isAboveMax ? dn.toString(maxCollDeposit) : value,
@@ -93,7 +72,7 @@ export function BorrowScreen() {
 
   const debt = useInputFieldValue(fmtnum);
 
-  const [interestRate, setInterestRate] = useState(dn.div(dn.from(INTEREST_RATE_DEFAULT, 18), 100));
+  const [interestRate, setInterestRate] = useState<null | Dnum>(null);
   const [interestRateMode, setInterestRateMode] = useState<DelegateMode>("manual");
   const [interestRateDelegate, setInterestRateDelegate] = useState<Address | null>(null);
 
@@ -106,15 +85,18 @@ export function BorrowScreen() {
   ] as const)));
 
   const collBalance = balances[collateral.symbol];
+  if (!collBalance) {
+    throw new Error(`Unknown collateral symbol: ${collateral.symbol}`);
+  }
 
-  const troveCount = useTrovesCount(account.address ?? null, collIndex);
+  const nextOwnerIndex = useNextOwnerIndex(account.address ?? null, branch.id);
 
   const loanDetails = getLoanDetails(
     deposit.isEmpty ? null : deposit.parsed,
     debt.isEmpty ? null : debt.parsed,
     interestRate,
     collateral.collateralRatio,
-    collPrice,
+    collPrice.data ?? null,
   );
 
   const debtSuggestions = loanDetails.maxDebt
@@ -135,10 +117,10 @@ export function BorrowScreen() {
         }
       }
 
-      const ltv = debt && loanDetails.deposit && collPrice && getLtv(
+      const ltv = debt && loanDetails.deposit && collPrice.data && getLtv(
         loanDetails.deposit,
         debt,
-        collPrice,
+        collPrice.data,
       );
 
       // don’t show if ltv > max LTV
@@ -152,9 +134,13 @@ export function BorrowScreen() {
     })
     : null;
 
-  const maxAmount = collBalance.data && dnumMax(
-    dn.sub(collBalance.data, collSymbol === "ETH" ? ETH_MAX_RESERVE : 0), // Only keep a reserve for ETH, not LSTs
-    dnum18(0),
+  const maxAmount = collBalance.data && dnumMin(
+    maxCollDeposit,
+    dnumMax(
+      // Only keep a reserve for ETH, not LSTs
+      dn.sub(collBalance.data, collSymbol === "ETH" ? ETH_MAX_RESERVE : 0),
+      dnum18(0),
+    ),
   );
 
   const isBelowMinDebt = debt.parsed && !debt.isEmpty && dn.lt(debt.parsed, MIN_DEBT);
@@ -165,7 +151,8 @@ export function BorrowScreen() {
     && debt.parsed
     && dn.gt(debt.parsed, 0)
     && interestRate
-    && dn.gt(interestRate, 0);
+    && dn.gt(interestRate, 0)
+    && !isBelowMinDebt;
 
   return (
     <Screen
@@ -174,7 +161,7 @@ export function BorrowScreen() {
           <HFlex>
             {content.borrowScreen.headline(
               <TokenIcon.Group>
-                {contracts.collaterals.map(({ symbol }) => (
+                {collaterals.map(({ symbol }) => (
                   <TokenIcon
                     key={symbol}
                     symbol={symbol}
@@ -206,27 +193,32 @@ export function BorrowScreen() {
                     icon: <TokenIcon symbol={symbol} />,
                     label: name,
                     value: account.isConnected
-                      ? fmtnum(balances[symbol].data ?? 0)
+                      ? fmtnum(balances[symbol]?.data ?? 0)
                       : "−",
                   }))}
                   menuPlacement="end"
                   menuWidth={300}
                   onSelect={(index) => {
+                    const coll = collaterals[index];
+                    if (!coll) {
+                      throw new Error(`Unknown branch: ${index}`);
+                    }
+
                     deposit.setValue("");
                     router.push(
-                      `/borrow/${collaterals[index].symbol.toLowerCase()}`,
+                      `/borrow/${coll.symbol.toLowerCase()}`,
                       { scroll: false },
                     );
                   }}
-                  selected={collIndex}
+                  selected={branch.id}
                 />
               }
               label="Collateral"
               placeholder="0.00"
               secondary={{
                 start: `$${
-                  deposit.parsed && collPrice
-                    ? fmtnum(dn.mul(collPrice, deposit.parsed), "2z")
+                  deposit.parsed && collPrice.data
+                    ? fmtnum(dn.mul(collPrice.data, deposit.parsed), "2z")
                     : "0.00"
                 }`,
                 end: maxAmount && dn.gt(maxAmount, 0) && (
@@ -242,9 +234,9 @@ export function BorrowScreen() {
             />
           }
           footer={{
-            start: collPrice && (
+            start: collPrice.data && (
               <Field.FooterInfoCollPrice
-                collPriceUsd={collPrice}
+                collPriceUsd={collPrice.data}
                 collName={collateral.name}
               />
             ),
@@ -276,7 +268,7 @@ export function BorrowScreen() {
               secondary={{
                 start: `$${
                   debt.parsed
-                    ? fmtnum(debt.parsed, "2z")
+                    ? fmtnum(debt.parsed)
                     : "0.00"
                 }`,
                 end: debtSuggestions && (
@@ -286,7 +278,11 @@ export function BorrowScreen() {
                         s.debt && s.risk && (
                           <PillButton
                             key={dn.toString(s.debt)}
-                            label={`$${fmtnum(s.debt, { compact: true, digits: 0 })}`}
+                            label={fmtnum(s.debt, {
+                              compact: true,
+                              digits: 0,
+                              prefix: "$",
+                            })}
                             onClick={() => {
                               if (s.debt) {
                                 debt.setValue(dn.toString(s.debt, 0));
@@ -331,7 +327,7 @@ export function BorrowScreen() {
           // “Interest rate”
           field={
             <InterestRateField
-              collIndex={collIndex}
+              branchId={branch.id}
               debt={debt.parsed}
               delegate={interestRateDelegate}
               inputId="input-interest-rate"
@@ -359,7 +355,7 @@ export function BorrowScreen() {
                 })}
               >
                 <IconSuggestion size={16} />
-                <>The interest rate can be adjusted</>
+                <>You can adjust this rate at any time</>
                 <InfoTooltip {...infoTooltipProps(content.generalInfotooltips.interestRateAdjustment)} />
               </span>
             ),
@@ -385,27 +381,33 @@ export function BorrowScreen() {
             size="large"
             wide
             onClick={() => {
-              if (deposit.parsed && debt.parsed && account.address) {
+              if (
+                interestRate
+                && deposit.parsed
+                && debt.parsed
+                && account.address
+                && interestRate
+                && typeof nextOwnerIndex.data === "number"
+              ) {
                 txFlow.start({
                   flowId: "openBorrowPosition",
-                  backLink: ["/borrow", "Back to editing"],
+                  backLink: [
+                    `/borrow/${collSymbol.toLowerCase()}`,
+                    "Back to editing",
+                  ],
                   successLink: ["/", "Go to the Dashboard"],
                   successMessage: "The position has been created successfully.",
 
-                  collIndex,
+                  branchId: branch.id,
                   owner: account.address,
-                  ownerIndex: troveCount.data ?? 0,
+                  ownerIndex: nextOwnerIndex.data,
                   collAmount: deposit.parsed,
                   boldAmount: debt.parsed,
-                  upperHint: dnum18(0),
-                  lowerHint: dnum18(0),
                   annualInterestRate: interestRate,
                   maxUpfrontFee: dnum18(maxUint256),
-                  interestRateDelegate: interestRateMode === "manual" || !interestRateDelegate ? null : [
-                    interestRateDelegate,
-                    MIN_ANNUAL_INTEREST_RATE,
-                    MAX_ANNUAL_INTEREST_RATE,
-                  ],
+                  interestRateDelegate: interestRateMode === "manual" || !interestRateDelegate
+                    ? null
+                    : interestRateDelegate,
                 });
               }
             }}

@@ -5,112 +5,108 @@ import { ETH_GAS_COMPENSATION, MAX_UPFRONT_FEE } from "@/src/constants";
 import { dnum18 } from "@/src/dnum-utils";
 import { fmtnum } from "@/src/formatting";
 import { getOpenLeveragedTroveParams } from "@/src/liquity-leverage";
-import { getCollToken, getPrefixedTroveId, usePredictOpenTroveUpfrontFee } from "@/src/liquity-utils";
+import {
+  getBranch,
+  getCollToken,
+  getPrefixedTroveId,
+  getTroveOperationHints,
+  usePredictOpenTroveUpfrontFee,
+} from "@/src/liquity-utils";
 import { AccountButton } from "@/src/screens/TransactionsScreen/AccountButton";
 import { LoanCard } from "@/src/screens/TransactionsScreen/LoanCard";
 import { TransactionDetailsRow } from "@/src/screens/TransactionsScreen/TransactionsScreen";
+import { TransactionStatus } from "@/src/screens/TransactionsScreen/TransactionStatus";
 import { usePrice } from "@/src/services/Prices";
-import { graphQuery, TroveByIdQuery } from "@/src/subgraph-queries";
-import { isTroveId } from "@/src/types";
-import { noop } from "@/src/utils";
+import { graphQuery, TroveStatusByIdQuery } from "@/src/subgraph-queries";
+import { noop, sleep } from "@/src/utils";
 import { vPositionLoanUncommited } from "@/src/valibot-utils";
-import { ADDRESS_ZERO } from "@liquity2/uikit";
+import { css } from "@/styled-system/css";
+import { ADDRESS_ZERO, InfoTooltip } from "@liquity2/uikit";
 import * as dn from "dnum";
 import * as v from "valibot";
-import { parseEventLogs } from "viem";
+import { maxUint256, parseEventLogs } from "viem";
 import { readContract } from "wagmi/actions";
+import { createRequestSchema, verifyTransaction } from "./shared";
 
-const FlowIdSchema = v.literal("openLeveragePosition");
+const RequestSchema = createRequestSchema(
+  "openLeveragePosition",
+  {
+    ownerIndex: v.number(),
+    leverageFactor: v.number(),
+    loan: vPositionLoanUncommited(),
+  },
+);
 
-const RequestSchema = v.object({
-  flowId: FlowIdSchema,
-  backLink: v.union([
-    v.null(),
-    v.tuple([
-      v.string(), // path
-      v.string(), // label
-    ]),
-  ]),
-  successLink: v.tuple([
-    v.string(), // path
-    v.string(), // label
-  ]),
-  successMessage: v.string(),
+export type OpenLeveragePositionRequest = v.InferOutput<typeof RequestSchema>;
 
-  ownerIndex: v.number(),
-  leverageFactor: v.number(),
-  loan: vPositionLoanUncommited(),
-});
-
-export type Request = v.InferOutput<typeof RequestSchema>;
-
-type Step =
-  | "approveLst"
-  | "openLeveragedTrove";
-
-export const openLeveragePosition: FlowDeclaration<Request, Step> = {
+export const openLeveragePosition: FlowDeclaration<OpenLeveragePositionRequest> = {
   title: "Review & Send Transaction",
-  Summary({ flow }) {
-    const { request } = flow;
-    const { loan } = request;
 
-    const collateral = getCollToken(loan.collIndex);
-
-    if (!collateral) {
-      throw new Error("Invalid collateral index");
-    }
-
+  Summary({ request }) {
     return (
       <LoanCard
         leverageMode={true}
         loadingState="success"
-        loan={loan}
+        loan={request.loan}
         onRetry={noop}
         txPreviewMode
       />
     );
   },
-  Details({ flow }) {
-    const { request } = flow;
+
+  Details({ request }) {
     const { loan } = request;
+    const collToken = getCollToken(loan.branchId);
+    if (!collToken) {
+      throw new Error(`Invalid branch: ${loan.branchId}`);
+    }
 
-    const collateral = getCollToken(loan.collIndex);
-    const collPrice = usePrice(collateral?.symbol ?? null);
-
-    const initialDeposit = dn.div(
-      loan.deposit,
-      request.leverageFactor,
-    );
-
-    const yearlyBoldInterest = dn.mul(loan.borrowed, loan.interestRate);
-
+    const collPrice = usePrice(collToken.symbol);
     const upfrontFee = usePredictOpenTroveUpfrontFee(
-      loan.collIndex,
+      loan.branchId,
       loan.borrowed,
       loan.interestRate,
     );
+
+    const initialDeposit = dn.div(loan.deposit, request.leverageFactor);
+    const yearlyBoldInterest = dn.mul(loan.borrowed, loan.interestRate);
     const borrowedWithFee = upfrontFee.data && dn.add(loan.borrowed, upfrontFee.data);
 
-    return collateral && (
+    return (
       <>
         <TransactionDetailsRow
           label="Initial deposit"
           value={[
-            `${fmtnum(initialDeposit)} ${collateral.name}`,
-            collPrice && `$${fmtnum(dn.mul(initialDeposit, collPrice))}`,
+            `${fmtnum(initialDeposit)} ${collToken.name}`,
+            collPrice.data && fmtnum(
+              dn.mul(initialDeposit, collPrice.data),
+              { preset: "2z", prefix: "$" },
+            ),
           ]}
         />
         <TransactionDetailsRow
           label="Borrowed"
           value={[
             `${fmtnum(borrowedWithFee)} BOLD`,
-            <Amount
-              key="end"
-              fallback="…"
-              prefix="Incl. "
-              value={upfrontFee.data}
-              suffix=" BOLD interest rate adjustment fee"
-            />,
+            <div
+              className={css({
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+              })}
+            >
+              <Amount
+                key="end"
+                fallback="…"
+                prefix="Incl. "
+                value={upfrontFee.data}
+                suffix=" BOLD creation fee"
+              />
+              <InfoTooltip heading="BOLD Creation Fee">
+                This fee is charged when you open a new loan or increase your debt. It corresponds to 7 days of average
+                interest for the respective collateral asset.
+              </InfoTooltip>
+            </div>,
           ]}
         />
         {loan.batchManager
@@ -120,7 +116,11 @@ export const openLeveragePosition: FlowDeclaration<Request, Step> = {
               value={[
                 <AccountButton key="start" address={loan.batchManager} />,
                 <div key="end">
-                  {fmtnum(loan.interestRate, "full", 100)}% (~{fmtnum(yearlyBoldInterest, 4)} BOLD per year)
+                  {fmtnum(loan.interestRate, "pctfull")}% ({fmtnum(yearlyBoldInterest, {
+                    digits: 4,
+                    dust: false,
+                    prefix: "~",
+                  })} BOLD per year)
                 </div>,
               ]}
             />
@@ -129,7 +129,7 @@ export const openLeveragePosition: FlowDeclaration<Request, Step> = {
             <TransactionDetailsRow
               label="Interest rate"
               value={[
-                `${fmtnum(loan.interestRate, 2, 100)}%`,
+                `${fmtnum(loan.interestRate, "pct2")}%`,
                 `${fmtnum(dn.mul(loan.borrowed, loan.interestRate))} BOLD per year`,
               ]}
             />
@@ -150,39 +150,162 @@ export const openLeveragePosition: FlowDeclaration<Request, Step> = {
     );
   },
 
-  async getSteps({
-    account,
-    contracts,
-    request,
-    wagmiConfig,
-  }) {
-    const { loan } = request;
-    const collateral = contracts.collaterals[loan.collIndex];
+  steps: {
+    approveLst: {
+      name: ({ request }) => {
+        const collToken = getCollToken(request.loan.branchId);
+        return `Approve ${collToken?.name ?? ""}`;
+      },
+      Status: (props) => (
+        <TransactionStatus
+          {...props}
+          approval="approve-only"
+        />
+      ),
+      async commit(ctx) {
+        const { loan } = ctx.request;
+        const initialDeposit = dn.div(loan.deposit, ctx.request.leverageFactor);
+        const branch = getBranch(loan.branchId);
+        const { LeverageLSTZapper, CollToken } = branch.contracts;
+        return ctx.writeContract({
+          ...CollToken,
+          functionName: "approve",
+          args: [
+            LeverageLSTZapper.address,
+            ctx.preferredApproveMethod === "approve-infinite"
+              ? maxUint256 // infinite approval
+              : initialDeposit[0], // exact amount
+          ],
+        });
+      },
+      async verify(ctx, hash) {
+        await verifyTransaction(ctx.wagmiConfig, hash, ctx.isSafe);
+      },
+    },
 
-    if (collateral.symbol === "ETH") {
+    openLeveragedTrove: {
+      name: () => "Open Multiply Position",
+      Status: TransactionStatus,
+
+      async commit(ctx) {
+        const { loan } = ctx.request;
+        const initialDeposit = dn.div(loan.deposit, ctx.request.leverageFactor);
+        const branch = getBranch(loan.branchId);
+        const { LeverageLSTZapper, LeverageWETHZapper } = branch.contracts;
+
+        const openLeveragedParams = await getOpenLeveragedTroveParams(
+          loan.branchId,
+          initialDeposit[0],
+          ctx.request.leverageFactor,
+          ctx.wagmiConfig,
+        );
+
+        const { upperHint, lowerHint } = await getTroveOperationHints({
+          wagmiConfig: ctx.wagmiConfig,
+          contracts: ctx.contracts,
+          branchId: loan.branchId,
+          interestRate: loan.interestRate[0],
+        });
+
+        const txParams = {
+          owner: loan.borrower,
+          ownerIndex: BigInt(ctx.request.ownerIndex),
+          collAmount: initialDeposit[0],
+          flashLoanAmount: openLeveragedParams.flashLoanAmount,
+          boldAmount: openLeveragedParams.effectiveBoldAmount,
+          upperHint,
+          lowerHint,
+          annualInterestRate: loan.batchManager ? 0n : loan.interestRate[0],
+          batchManager: loan.batchManager ?? ADDRESS_ZERO,
+          maxUpfrontFee: MAX_UPFRONT_FEE,
+          addManager: ADDRESS_ZERO,
+          removeManager: ADDRESS_ZERO,
+          receiver: ADDRESS_ZERO,
+        };
+
+        // ETH collateral case
+        if (branch.symbol === "ETH") {
+          return ctx.writeContract({
+            ...LeverageWETHZapper,
+            functionName: "openLeveragedTroveWithRawETH",
+            args: [txParams],
+            value: initialDeposit[0] + ETH_GAS_COMPENSATION[0],
+          });
+        }
+
+        // LST collateral case
+        return ctx.writeContract({
+          ...LeverageLSTZapper,
+          functionName: "openLeveragedTroveWithRawETH",
+          args: [txParams],
+          value: ETH_GAS_COMPENSATION[0],
+        });
+      },
+
+      async verify(ctx, hash) {
+        const receipt = await verifyTransaction(ctx.wagmiConfig, hash, ctx.isSafe);
+
+        // Extract trove ID from logs
+        const collToken = getCollToken(ctx.request.loan.branchId);
+        if (!collToken) throw new Error("Invalid branch");
+
+        const branch = getBranch(ctx.request.loan.branchId);
+        const [troveOperation] = parseEventLogs({
+          abi: branch.contracts.TroveManager.abi,
+          logs: receipt.logs,
+          eventName: "TroveOperation",
+        });
+
+        if (!troveOperation?.args?._troveId) {
+          throw new Error("Failed to extract trove ID from transaction");
+        }
+
+        // Wait for trove to appear in subgraph
+        const prefixedTroveId = getPrefixedTroveId(
+          ctx.request.loan.branchId,
+          `0x${troveOperation.args._troveId.toString(16)}`,
+        );
+
+        while (true) {
+          const { trove: troveStatus } = await graphQuery(TroveStatusByIdQuery, {
+            id: prefixedTroveId,
+          });
+          if (troveStatus !== null) {
+            break;
+          }
+          await sleep(1000);
+        }
+      },
+    },
+  },
+
+  async getSteps(ctx) {
+    const { loan } = ctx.request;
+    const collToken = getCollToken(loan.branchId);
+    if (!collToken) {
+      throw new Error("Invalid branch: " + loan.branchId);
+    }
+
+    // ETH doesn't need approval
+    if (collToken.symbol === "ETH") {
       return ["openLeveragedTrove"];
     }
 
-    const { LeverageLSTZapper, CollToken } = collateral.contracts;
+    const branch = getBranch(loan.branchId);
+    const { LeverageLSTZapper, CollToken } = branch.contracts;
 
     const allowance = dnum18(
-      await readContract(wagmiConfig, {
+      await readContract(ctx.wagmiConfig, {
         ...CollToken,
         functionName: "allowance",
-        args: [
-          account.address ?? ADDRESS_ZERO,
-          LeverageLSTZapper.address,
-        ],
+        args: [ctx.account, LeverageLSTZapper.address],
       }),
     );
 
-    const initialDeposit = dn.div(loan.deposit, request.leverageFactor);
+    const steps: string[] = [];
 
-    const isApproved = dn.gte(allowance, initialDeposit);
-
-    const steps: Step[] = [];
-
-    if (!isApproved) {
+    const initialDeposit = dn.div(loan.deposit, ctx.request.leverageFactor);
+    if (dn.lt(allowance, initialDeposit)) {
       steps.push("approveLst");
     }
 
@@ -191,141 +314,7 @@ export const openLeveragePosition: FlowDeclaration<Request, Step> = {
     return steps;
   },
 
-  getStepName(stepId, { request }) {
-    const { loan } = request;
-    const collateral = getCollToken(loan.collIndex);
-    if (!collateral) {
-      throw new Error("Invalid collateral index: " + loan.collIndex);
-    }
-    if (stepId === "approveLst") {
-      return `Approve ${collateral.name ?? ""}`;
-    }
-    return "Open Leveraged Position";
-  },
-
   parseRequest(request) {
     return v.parse(RequestSchema, request);
-  },
-
-  parseReceipt(stepId, receipt, { request, contracts }): string | null {
-    const { loan } = request;
-    const collateral = contracts.collaterals[loan.collIndex];
-    if (stepId === "openLeveragedTrove") {
-      const [troveOperation] = parseEventLogs({
-        abi: collateral.contracts.TroveManager.abi,
-        logs: receipt.logs,
-        eventName: "TroveOperation",
-      });
-      if (troveOperation) {
-        return "0x" + (troveOperation.args._troveId.toString(16));
-      }
-    }
-    return null;
-  },
-
-  async writeContractParams(stepId, { contracts, request, wagmiConfig }) {
-    const { loan } = request;
-    const collateral = contracts.collaterals[loan.collIndex];
-    const initialDeposit = dn.div(loan.deposit, request.leverageFactor);
-
-    const { LeverageLSTZapper, CollToken, LeverageWETHZapper } = collateral.contracts;
-
-    // Approve LST
-    if (stepId === "approveLst") {
-      return {
-        ...CollToken,
-        functionName: "approve" as const,
-        args: [
-          LeverageLSTZapper.address,
-          initialDeposit[0],
-        ],
-      };
-    }
-
-    // LeverageWETHZapper
-    if (collateral.symbol === "ETH" && stepId === "openLeveragedTrove") {
-      const params = await getOpenLeveragedTroveParams(
-        loan.collIndex,
-        initialDeposit[0],
-        request.leverageFactor,
-        wagmiConfig,
-      );
-      return {
-        ...LeverageWETHZapper,
-        functionName: "openLeveragedTroveWithRawETH" as const,
-        args: [{
-          owner: loan.borrower,
-          ownerIndex: BigInt(request.ownerIndex),
-          collAmount: initialDeposit[0],
-          flashLoanAmount: params.flashLoanAmount,
-          boldAmount: params.effectiveBoldAmount,
-          upperHint: 0n,
-          lowerHint: 0n,
-          annualInterestRate: loan.batchManager ? 0n : loan.interestRate[0],
-          batchManager: loan.batchManager ?? ADDRESS_ZERO,
-          maxUpfrontFee: MAX_UPFRONT_FEE,
-          addManager: ADDRESS_ZERO,
-          removeManager: ADDRESS_ZERO,
-          receiver: ADDRESS_ZERO,
-        }],
-        value: initialDeposit[0] + ETH_GAS_COMPENSATION[0],
-      };
-    }
-
-    // LeverageLSTZapper
-    if (stepId === "openLeveragedTrove") {
-      const params = await getOpenLeveragedTroveParams(
-        loan.collIndex,
-        initialDeposit[0],
-        request.leverageFactor,
-        wagmiConfig,
-      );
-      return {
-        ...LeverageLSTZapper,
-        functionName: "openLeveragedTroveWithRawETH" as const,
-        args: [{
-          owner: loan.borrower,
-          ownerIndex: BigInt(request.ownerIndex),
-          collAmount: initialDeposit[0],
-          flashLoanAmount: params.flashLoanAmount,
-          boldAmount: params.effectiveBoldAmount,
-          upperHint: 0n,
-          lowerHint: 0n,
-          annualInterestRate: loan.batchManager ? 0n : loan.interestRate[0],
-          batchManager: loan.batchManager ?? ADDRESS_ZERO,
-          maxUpfrontFee: MAX_UPFRONT_FEE,
-          addManager: ADDRESS_ZERO,
-          removeManager: ADDRESS_ZERO,
-          receiver: ADDRESS_ZERO,
-        }],
-        value: ETH_GAS_COMPENSATION[0],
-      };
-    }
-
-    throw new Error("Not implemented");
-  },
-
-  async postFlowCheck({ request, steps, storedState }) {
-    const lastStep = steps?.at(-1);
-
-    if (lastStep?.txStatus !== "post-check" || !isTroveId(lastStep.txReceiptData)) {
-      return;
-    }
-
-    const prefixedTroveId = getPrefixedTroveId(request.loan.collIndex, lastStep.txReceiptData);
-    while (true) {
-      const { trove } = await graphQuery(TroveByIdQuery, { id: prefixedTroveId });
-      if (trove !== null) {
-        storedState.setState(({ loanModes }) => {
-          return {
-            loanModes: {
-              ...loanModes,
-              [prefixedTroveId]: "leverage",
-            },
-          };
-        });
-        return;
-      }
-    }
   },
 };

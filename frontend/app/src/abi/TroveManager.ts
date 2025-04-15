@@ -72,14 +72,14 @@ export const TroveManager = [
   },
   {
     "type": "function",
-    "name": "getEntireSystemColl",
+    "name": "getEntireBranchColl",
     "inputs": [],
     "outputs": [{ "name": "entireSystemColl", "type": "uint256", "internalType": "uint256" }],
     "stateMutability": "view",
   },
   {
     "type": "function",
-    "name": "getEntireSystemDebt",
+    "name": "getEntireBranchDebt",
     "inputs": [],
     "outputs": [{ "name": "entireSystemDebt", "type": "uint256", "internalType": "uint256" }],
     "stateMutability": "view",
@@ -213,6 +213,7 @@ export const TroveManager = [
     "inputs": [
       { "name": "_troveId", "type": "uint256", "internalType": "uint256" },
       { "name": "_newTroveColl", "type": "uint256", "internalType": "uint256" },
+      { "name": "_newTroveDebt", "type": "uint256", "internalType": "uint256" },
       {
         "name": "_troveChange",
         "type": "tuple",
@@ -761,4 +762,5 @@ export const TroveManager = [
   { "type": "error", "name": "NotShutDown", "inputs": [] },
   { "type": "error", "name": "NothingToLiquidate", "inputs": [] },
   { "type": "error", "name": "OnlyOneTroveLeft", "inputs": [] },
+  { "type": "error", "name": "ZeroAmount", "inputs": [] },
 ] as const;

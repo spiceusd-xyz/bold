@@ -4,10 +4,16 @@ import type { CollateralSymbol } from "@/src/types";
 
 import { Amount } from "@/src/comps/Amount/Amount";
 import { Positions } from "@/src/comps/Positions/Positions";
-import { getContracts } from "@/src/contracts";
 import { DNUM_1 } from "@/src/dnum-utils";
-import { getCollIndexFromSymbol, getCollToken, useAverageInterestRate, useEarnPool } from "@/src/liquity-utils";
-import { useAccount } from "@/src/services/Ethereum";
+import {
+  getBranch,
+  getBranches,
+  getCollToken,
+  useAverageInterestRate,
+  useBranchDebt,
+  useEarnPool,
+} from "@/src/liquity-utils";
+import { useAccount } from "@/src/wagmi-utils";
 import { css } from "@/styled-system/css";
 import { AnchorTextButton, IconBorrow, IconEarn, TokenIcon } from "@liquity2/uikit";
 import * as dn from "dnum";
@@ -16,10 +22,7 @@ import { HomeTable } from "./HomeTable";
 
 export function HomeScreen() {
   const account = useAccount();
-
-  const { collaterals } = getContracts();
-  const collSymbols = collaterals.map((coll) => coll.symbol);
-
+  const branches = getBranches();
   return (
     <div
       className={css({
@@ -42,8 +45,18 @@ export function HomeScreen() {
           title="Borrow BOLD against ETH and staked ETH"
           subtitle="You can adjust your loans, including your interest rate, at any time"
           icon={<IconBorrow />}
-          columns={["Collateral", "Avg rate, p.a.", "Max LTV", null] as const}
-          rows={collSymbols.map((symbol) => (
+          columns={[
+            "Collateral",
+            <span title="Average interest rate, per annum">
+              Avg rate, p.a.
+            </span>,
+            <span title="Maximum Loan-to-Value ratio">
+              Max LTV
+            </span>,
+            "Total debt",
+            null,
+          ] as const}
+          rows={branches.map(({ symbol }) => (
             <BorrowingRow
               key={symbol}
               symbol={symbol}
@@ -54,8 +67,16 @@ export function HomeScreen() {
           title="Earn rewards with BOLD"
           subtitle="Earn BOLD & (staked) ETH rewards by putting your BOLD in a stability pool"
           icon={<IconEarn />}
-          columns={["Pool", "Current APR", "Pool size", null] as const}
-          rows={collSymbols.map((symbol) => (
+          columns={[
+            "Pool",
+            <abbr title="Annual Percentage Rate over the last 24 hours">APR</abbr>,
+            <abbr title="Annual Percentage Rate over the last 7 days">
+              7d APR
+            </abbr>,
+            "Pool size",
+            null,
+          ] as const}
+          rows={branches.map(({ symbol }) => (
             <EarnRewardsRow
               key={symbol}
               symbol={symbol}
@@ -72,9 +93,10 @@ function BorrowingRow({
 }: {
   symbol: CollateralSymbol;
 }) {
-  const collIndex = getCollIndexFromSymbol(symbol);
-  const collateral = getCollToken(collIndex);
-  const avgInterestRate = useAverageInterestRate(collIndex);
+  const branch = getBranch(symbol);
+  const collateral = getCollToken(branch.id);
+  const avgInterestRate = useAverageInterestRate(branch.id);
+  const branchDebt = useBranchDebt(branch.id);
 
   const maxLtv = collateral?.collateralRatio && dn.gt(collateral.collateralRatio, 0)
     ? dn.div(DNUM_1, collateral.collateralRatio)
@@ -108,6 +130,13 @@ function BorrowingRow({
         />
       </td>
       <td>
+        <Amount
+          format="compact"
+          prefix="$"
+          value={branchDebt.data}
+        />
+      </td>
+      <td>
         <div
           className={css({
             display: "flex",
@@ -138,7 +167,7 @@ function BorrowingRow({
             />
           </Link>
           <Link
-            href={`/leverage/${symbol.toLowerCase()}`}
+            href={`/multiply/${symbol.toLowerCase()}`}
             legacyBehavior
             passHref
           >
@@ -152,7 +181,7 @@ function BorrowingRow({
                     fontSize: 14,
                   })}
                 >
-                  Leverage
+                  Multiply
                   <TokenIcon symbol={symbol} size="mini" />
                 </div>
               }
@@ -170,9 +199,9 @@ function EarnRewardsRow({
 }: {
   symbol: CollateralSymbol;
 }) {
-  const collIndex = getCollIndexFromSymbol(symbol);
-  const collateral = getCollToken(collIndex);
-  const earnPool = useEarnPool(collIndex);
+  const branch = getBranch(symbol);
+  const collateral = getCollToken(branch.id);
+  const earnPool = useEarnPool(branch.id);
 
   return (
     <tr>
@@ -193,6 +222,13 @@ function EarnRewardsRow({
           fallback="…"
           percentage
           value={earnPool.data?.apr}
+        />
+      </td>
+      <td>
+        <Amount
+          fallback="…"
+          percentage
+          value={earnPool.data?.apr7d}
         />
       </td>
       <td>

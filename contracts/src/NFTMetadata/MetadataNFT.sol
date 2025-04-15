@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import "lib/Solady/src/utils/SSTORE2.sol";
+import "Solady/utils/SSTORE2.sol";
 import "./utils/JSON.sol";
 
 import "./utils/baseSVG.sol";
@@ -9,7 +9,7 @@ import "./utils/bauhaus.sol";
 
 import "openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import {ITroveManager} from "src/Interfaces/ITroveManager.sol";
+import {ITroveManager} from "../Interfaces/ITroveManager.sol";
 
 interface IMetadataNFT {
     struct TroveData {
@@ -29,16 +29,22 @@ interface IMetadataNFT {
 contract MetadataNFT is IMetadataNFT {
     FixedAssetReader public immutable assetReader;
 
-    string public constant name = "SpiceUSD Trove";
-    string public constant description = "SpiceUSD Trove position";
-
     constructor(FixedAssetReader _assetReader) {
         assetReader = _assetReader;
     }
 
     function uri(TroveData memory _troveData) public view returns (string memory) {
         string memory attr = attributes(_troveData);
-        return json.formattedMetadata(name, description, renderSVGImage(_troveData), attr);
+        return json.formattedMetadata(
+            string.concat("SpiceUSD - ", IERC20Metadata(_troveData._collToken).name()),
+            string.concat(
+                "SpiceUSD is a collateralized debt platform. Users can lock up ",
+                IERC20Metadata(_troveData._collToken).symbol(),
+                " to issue stablecoin tokens (SUSD) to their own Ethereum address. The individual collateralized debt positions are called Troves, and are represented as NFTs."
+            ),
+            renderSVGImage(_troveData),
+            attr
+        );
     }
 
     function renderSVGImage(TroveData memory _troveData) internal view returns (string memory) {

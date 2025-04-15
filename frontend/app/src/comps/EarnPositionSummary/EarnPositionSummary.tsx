@@ -1,53 +1,60 @@
-import type { CollIndex, PositionEarn } from "@/src/types";
+import type { BranchId, Dnum, PositionEarn } from "@/src/types";
 import type { ReactNode } from "react";
 
 import { Amount } from "@/src/comps/Amount/Amount";
 import { TagPreview } from "@/src/comps/TagPreview/TagPreview";
 import { fmtnum } from "@/src/formatting";
-import { getCollToken, useEarnPool } from "@/src/liquity-utils";
+import { getCollToken, isEarnPositionActive, useEarnPool } from "@/src/liquity-utils";
 import { css } from "@/styled-system/css";
 import { HFlex, IconArrowRight, IconPlus, InfoTooltip, TokenIcon } from "@liquity2/uikit";
 import * as dn from "dnum";
 import Link from "next/link";
-
 export function EarnPositionSummary({
-  collIndex,
-  prevEarnPosition,
+  branchId,
   earnPosition,
   linkToScreen,
+  poolDeposit,
+  prevEarnPosition = null,
+  prevPoolDeposit,
   title,
   txPreviewMode,
-}: {
-  collIndex: CollIndex;
-  prevEarnPosition?: PositionEarn | null;
-  earnPosition: PositionEarn | null;
-  linkToScreen?: boolean;
-  title?: ReactNode;
-  txPreviewMode?: boolean;
-}) {
-  const collToken = getCollToken(collIndex);
-  const earnPool = useEarnPool(collIndex);
+}:
+  & {
+    branchId: BranchId;
+    earnPosition: PositionEarn | null;
+    linkToScreen?: boolean;
+    prevEarnPosition?: PositionEarn | null;
+    title?: ReactNode;
+    txPreviewMode?: boolean;
+  }
+  & (
+    | { poolDeposit: Dnum; prevPoolDeposit: Dnum }
+    | { poolDeposit?: undefined; prevPoolDeposit?: undefined }
+  ))
+{
+  const collToken = getCollToken(branchId);
+  const earnPool = useEarnPool(branchId);
 
-  const { totalDeposited: totalPoolDeposit } = earnPool.data;
-
-  let share = dn.from(0, 18);
-  let prevShare = dn.from(0, 18);
-  if (totalPoolDeposit && dn.gt(totalPoolDeposit, 0)) {
-    if (earnPosition) {
-      share = dn.div(earnPosition.deposit, totalPoolDeposit);
-    }
-    if (prevEarnPosition) {
-      prevShare = dn.div(prevEarnPosition.deposit, totalPoolDeposit);
-    }
+  // The earnUpdate tx flow provides static values
+  // for poolDeposit and prevPoolDeposit. If these are
+  // not provided, we use the values from the earnPool data.
+  if (!poolDeposit) {
+    poolDeposit = earnPool.data?.totalDeposited ?? undefined;
   }
 
-  // true if the user has any deposit
-  // in the pool or in tx preview mode.
-  const active = txPreviewMode || Boolean(
-    earnPosition?.deposit && dn.gt(earnPosition.deposit, 0),
-  );
+  let share = dn.from(0, 18);
+  if (earnPosition && poolDeposit && dn.gt(poolDeposit, 0)) {
+    share = dn.div(earnPosition.deposit, poolDeposit);
+  }
 
-  return collToken && (
+  let prevShare = dn.from(0, 18);
+  if (prevEarnPosition && prevPoolDeposit && dn.gt(prevPoolDeposit, 0)) {
+    prevShare = dn.div(prevEarnPosition.deposit, prevPoolDeposit);
+  }
+
+  const active = txPreviewMode || isEarnPositionActive(earnPosition);
+
+  return (
     <div
       className={css({
         position: "relative",
@@ -133,7 +140,7 @@ export function EarnPositionSummary({
                   fallback="-"
                   format="compact"
                   prefix="$"
-                  value={totalPoolDeposit}
+                  value={poolDeposit}
                 />
               </div>
               <InfoTooltip heading="Total Value Locked (TVL)">
@@ -150,12 +157,37 @@ export function EarnPositionSummary({
           >
             {txPreviewMode ? <TagPreview /> : (
               <>
-                <div>
-                  <Amount
-                    fallback="-%"
-                    format="1z"
-                    percentage
-                    value={earnPool.data?.apr}
+                <div
+                  className={css({
+                    display: "flex",
+                    gap: 6,
+                  })}
+                >
+                  <div
+                    className={css({
+                      color: "contentAlt2",
+                    })}
+                  >
+                    APR
+                  </div>
+                  <div>
+                    <Amount
+                      fallback="-%"
+                      format="1z"
+                      percentage
+                      value={earnPool.data?.apr}
+                    />
+                  </div>
+                  <InfoTooltip
+                    content={{
+                      heading: "Current APR",
+                      body: "The annualized rate this stability pool’s "
+                        + "deposits earned over the last 24 hours.",
+                      footerLink: {
+                        label: "Check Dune for more details",
+                        href: "https://dune.com/liquity/liquity-v2",
+                      },
+                    }}
                   />
                 </div>
                 <div
@@ -164,14 +196,31 @@ export function EarnPositionSummary({
                     gap: 4,
                     fontSize: 14,
                   })}
-                  style={{
-                    color: `var(--fg-secondary-${active ? "active" : "inactive"})`,
-                  }}
                 >
-                  <div>Current APR</div>
-                  <InfoTooltip heading="Annual Percentage Rate (APR)">
-                    The annualized rate this stability pool’s deposits earned over the past 7 days.
-                  </InfoTooltip>
+                  <div
+                    className={css({
+                      color: "contentAlt2",
+                    })}
+                  >
+                    7d APR
+                  </div>
+                  <Amount
+                    fallback="-%"
+                    format="1z"
+                    percentage
+                    value={earnPool.data?.apr7d}
+                  />
+                  <InfoTooltip
+                    content={{
+                      heading: "APR (last 7 days)",
+                      body: "The annualized percentage rate this stability pool’s "
+                        + "deposits earned over the past 7 days.",
+                      footerLink: {
+                        label: "Check Dune for more details",
+                        href: "https://dune.com/liquity/liquity-v2",
+                      },
+                    }}
+                  />
                 </div>
               </>
             )}

@@ -69,7 +69,6 @@ export async function main() {
 
   let isLocal = false;
 
-  // network preset: local
   if (networkPreset === "local") {
     options.name ??= "liquity2/liquity2";
     options.graphNode ??= "http://localhost:8020/";
@@ -79,18 +78,13 @@ export async function main() {
   }
 
   if (networkPreset === "sepolia") {
-    options.name ??= "liquity2-sepolia";
+    options.name ??= "liquity2-sepolia-preview";
     options.network ??= "sepolia";
   }
 
-  // network preset: liquity-testnet
-  if (networkPreset === "liquity-testnet") {
-    // TODO: implement
-  }
-
-  // network preset: mainnet
   if (networkPreset === "mainnet") {
-    // TODO: implement
+    options.name ??= "liquity2-mainnet";
+    options.network ??= "mainnet";
   }
 
   if (!options.name) {

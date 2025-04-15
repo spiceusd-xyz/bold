@@ -1,5 +1,8 @@
+"use client";
+
 import type { ComponentPropsWithoutRef } from "react";
 
+import { useId } from "react";
 import { css, cx } from "../../styled-system/css";
 
 export function TextInput({
@@ -9,6 +12,7 @@ export function TextInput({
 }: Omit<ComponentPropsWithoutRef<"input">, "onChange"> & {
   onChange?: (value: string) => void;
 }) {
+  const id = useId();
   return (
     <input
       type="text"
@@ -16,6 +20,7 @@ export function TextInput({
       onChange={(event) => {
         onChange?.(event.target.value);
       }}
+      name={`input-${id}`}
       className={cx(
         css({
           width: "100%",

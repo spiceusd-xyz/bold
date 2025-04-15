@@ -1,4 +1,4 @@
-import type { CollIndex, PositionEarn, TokenSymbol } from "@/src/types";
+import type { BranchId, PositionEarn, TokenSymbol } from "@/src/types";
 import type { Dnum } from "dnum";
 import { ReactNode } from "react";
 
@@ -7,37 +7,37 @@ import { ConnectWarningBox } from "@/src/comps/ConnectWarningBox/ConnectWarningB
 import content from "@/src/content";
 import { DNUM_0 } from "@/src/dnum-utils";
 import { getCollToken } from "@/src/liquity-utils";
-import { useAccount } from "@/src/services/Ethereum";
 import { usePrice } from "@/src/services/Prices";
 import { useTransactionFlow } from "@/src/services/TransactionFlow";
+import { useAccount } from "@/src/wagmi-utils";
 import { css } from "@/styled-system/css";
 import { Button, HFlex, TokenIcon, VFlex } from "@liquity2/uikit";
 import * as dn from "dnum";
 
 export function PanelClaimRewards({
-  collIndex,
+  branchId,
   position,
 }: {
-  collIndex: null | CollIndex;
+  branchId: null | BranchId;
   position?: PositionEarn;
 }) {
   const account = useAccount();
   const txFlow = useTransactionFlow();
 
-  const collateral = getCollToken(collIndex);
+  const collateral = getCollToken(branchId);
   if (!collateral) {
-    throw new Error(`Invalid collateral index: ${collIndex}`);
+    throw new Error(`Invalid branch: ${branchId}`);
   }
 
   const boldPriceUsd = usePrice("BOLD");
-  const collPriceUsd = usePrice(collateral.symbol ?? null);
+  const collPriceUsd = usePrice(collateral.symbol);
 
-  const totalRewards = collPriceUsd && boldPriceUsd && dn.add(
-    dn.mul(position?.rewards?.bold ?? DNUM_0, boldPriceUsd),
-    dn.mul(position?.rewards?.coll ?? DNUM_0, collPriceUsd),
+  const totalRewards = collPriceUsd.data && boldPriceUsd.data && dn.add(
+    dn.mul(position?.rewards?.bold ?? DNUM_0, boldPriceUsd.data),
+    dn.mul(position?.rewards?.coll ?? DNUM_0, collPriceUsd.data),
   );
 
-  const gasFeeUsd = collPriceUsd && dn.multiply(dn.from(0.0015, 18), collPriceUsd);
+  const gasFeeUsd = collPriceUsd.data && dn.multiply(dn.from(0.0015, 18), collPriceUsd.data);
 
   const allowSubmit = account.isConnected && totalRewards && dn.gt(totalRewards, 0);
 

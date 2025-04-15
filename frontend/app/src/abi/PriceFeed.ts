@@ -9,18 +9,22 @@ export const PriceFeed = [{
     "type": "bool",
     "internalType": "bool",
   }],
-  "stateMutability": "view",
+  "stateMutability": "nonpayable",
 }, {
   "type": "function",
-  "name": "getEthUsdStalenessThreshold",
+  "name": "fetchRedemptionPrice",
   "inputs": [],
-  "outputs": [{ "name": "", "type": "uint256", "internalType": "uint256" }],
-  "stateMutability": "pure",
+  "outputs": [{ "name": "", "type": "uint256", "internalType": "uint256" }, {
+    "name": "",
+    "type": "bool",
+    "internalType": "bool",
+  }],
+  "stateMutability": "nonpayable",
 }, {
   "type": "function",
   "name": "getPrice",
   "inputs": [],
-  "outputs": [{ "name": "_price", "type": "uint256", "internalType": "uint256" }],
+  "outputs": [{ "name": "", "type": "uint256", "internalType": "uint256" }],
   "stateMutability": "view",
 }, {
   "type": "function",
@@ -37,7 +41,12 @@ export const PriceFeed = [{
 }, {
   "type": "function",
   "name": "setPrice",
-  "inputs": [{ "name": "_price", "type": "uint256", "internalType": "uint256" }],
-  "outputs": [],
+  "inputs": [{ "name": "price", "type": "uint256", "internalType": "uint256" }],
+  "outputs": [{ "name": "", "type": "bool", "internalType": "bool" }],
   "stateMutability": "nonpayable",
+}, {
+  "type": "event",
+  "name": "LastGoodPriceUpdated",
+  "inputs": [{ "name": "_lastGoodPrice", "type": "uint256", "indexed": false, "internalType": "uint256" }],
+  "anonymous": false,
 }] as const;
