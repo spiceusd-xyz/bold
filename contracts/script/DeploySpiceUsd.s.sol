@@ -135,12 +135,12 @@ contract DeploySpiceUsdScript is StdCheats, MetadataDeployment {
 
         TroveManagerParams[] memory troveManagerParamsArray = new TroveManagerParams[](6);
 
-        troveManagerParamsArray[0] = TroveManagerParams(131e16, 125e16, 110e16, 0, 5e16, 10e16); // WETH
-        troveManagerParamsArray[1] = TroveManagerParams(116e16, 111e16, 105e16, 0, 5e16, 10e16); // USDB
-        troveManagerParamsArray[2] = TroveManagerParams(149e16, 142e16, 112e16, 0, 5e16, 10e16); // BLAST
-        troveManagerParamsArray[3] = TroveManagerParams(174e16, 166e16, 131e16, 0, 5e16, 10e16); // FNX
-        troveManagerParamsArray[4] = TroveManagerParams(174e16, 166e16, 131e16, 0, 5e16, 10e16); // HYPER
-        troveManagerParamsArray[5] = TroveManagerParams(131e16, 166e16, 131e16, 0, 5e16, 10e16); // THRUST
+        troveManagerParamsArray[0] = TroveManagerParams(131e16, 125e16, 110e16, 10e16, 5e16, 10e16); // WETH
+        troveManagerParamsArray[1] = TroveManagerParams(116e16, 111e16, 105e16, 10e16, 5e16, 10e16); // USDB
+        troveManagerParamsArray[2] = TroveManagerParams(149e16, 142e16, 112e16, 10e16, 5e16, 10e16); // BLAST
+        troveManagerParamsArray[3] = TroveManagerParams(174e16, 166e16, 131e16, 10e16, 5e16, 10e16); // FNX
+        troveManagerParamsArray[4] = TroveManagerParams(174e16, 166e16, 131e16, 10e16, 5e16, 10e16); // HYPER
+        troveManagerParamsArray[5] = TroveManagerParams(131e16, 166e16, 131e16, 10e16, 5e16, 10e16); // THRUST
 
         address[] memory collTokens = new address[](6);
         collTokens[0] = NR_ETH_ADDRESS; // NrETH
